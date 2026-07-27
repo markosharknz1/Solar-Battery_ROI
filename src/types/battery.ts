@@ -1,0 +1,115 @@
+export interface RebatePreset {
+  id: string
+  name: string // e.g. "Federal Cheaper Home Batteries Program"
+  jurisdiction: string // e.g. "Federal", "VIC", "NSW"
+  description: string
+  /** Flat rebate amount in AUD, or a $/kWh discount applied to capacity at edit time */
+  amountAud?: number
+  perKwhAud?: number
+}
+
+export interface BatteryQuote {
+  id: string
+  name: string // e.g. "Tesla Powerwall 2 quote"
+
+  // Capacity
+  capacityKwh: number // usable (nameplate) capacity
+  maxChargeKw: number
+  maxDischargeKw: number
+  roundTripEfficiency: number // 0-1, typically 0.90
+
+  // Cost
+  totalCostAud: number // installed cost
+  rebatePresetIds?: string[]
+  governmentRebatesAud: number // subtracted for payback calc
+
+  // Warranty
+  warrantyYears: number
+  warrantyThroughputMwh: number | null
+
+  // Lifetime & degradation
+  lifetimeYears: number // 1-15
+  totalDegradationPercent: number // 0-50, straight-line over lifetimeYears
+
+  // Discharge limits
+  maxDischargePercent: number // 0-100, health limit
+  reservePercent: number // 0-30, backup reserve
+  targetMinDischargePct: number // sizing target lower bound
+  targetMaxDischargePct: number // sizing target upper bound
+
+  // Backup
+  backupCapable: boolean
+
+  // Charge/discharge strategy
+  chargePriority: 'solar_only' | 'solar_then_offpeak' | 'solar_then_arbitrage' | 'arbitrage_only'
+  dischargePriority: 'peak_only' | 'any_import'
+  arbitrageTargetPercent: number // % of capacity to charge from grid overnight
+  arbitrageStartTime: string // 'HH:MM'
+  arbitrageEndTime: string
+
+  // Solar system
+  solarSystemKw: number | null
+  inverterKw: number | null
+  exportLimitKw: number | null
+
+  // VPP
+  vppEnrolled: boolean
+  vppAnnualCreditAud: number
+}
+
+export interface BatterySimResult {
+  quoteId: string
+  tariffId: string
+
+  // Annual projections
+  annualSavingsAud: number
+  annualGridImportKwh: number // with battery
+  annualGridImportKwhBase: number // without battery
+  annualSolarExportKwh: number // with battery
+  annualSolarExportKwhBase: number
+  selfConsumptionRate: number
+  simplePaybackYears: number
+  lifetimeSavingsAud: number
+  costPerKwhStored: number
+  vppCreditAud: number
+
+  // Cycle statistics
+  totalEquivCycles: number
+  annualEquivCycles: number
+  avgDailyCycles: number
+  dailyCycleDepths: number[] // one value per day (0.0-1.0+)
+
+  // Warranty comparison
+  yearsTillThroughputExpiry: number | null
+  yearsTillYearWarrantyExpiry: number
+  effectiveWarrantyYears: number
+  lifetimeKwhStoredAtWarranty: number
+
+  // Sizing
+  daysFull: number // days battery was 100% full before evening
+  daysEmpty: number // days battery was depleted before midnight
+  avgDailyCycleDepthPercent: number
+  daysUnderMinDischarge: number
+  daysOverMaxDischarge: number
+
+  // Curtailment (0 if no inverter data or no export limit set)
+  estimatedCurtailmentKwhAnnual: number
+  curtailmentCaptureKwhAnnual: number
+  curtailmentCapturePercent: number
+  peakCurtailmentSlot: number
+
+  // Day-by-day for SoC chart
+  dailySoc: Array<{ date: string; avgSocKwh: number; cyclesFraction: number }>
+
+  // Arbitrage
+  arbitrageAnnualValueAud: number
+
+  // Backup
+  estimatedBackupHoursAvg: number
+  estimatedBackupHoursMax: number
+
+  // Savings breakdown (annualised, kept from Phase 1 for the breakdown chart)
+  importCostSavedAud: number
+  exportCreditLostAud: number
+  fixedChargesAud: number
+}
