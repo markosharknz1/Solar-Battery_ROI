@@ -11,6 +11,7 @@ export interface RatePeriod {
   startTime: string // "HH:MM" 24h
   endTime: string // "HH:MM" 24h - can wrap past midnight
   ratePerKwh: number // dollars - 0 for free periods
+  gstInclusive: boolean // if false, ratePerKwh is grossed up by 10% when resolved
   days: boolean[] // [Mon, Tue, Wed, Thu, Fri, Sat, Sun]
 }
 

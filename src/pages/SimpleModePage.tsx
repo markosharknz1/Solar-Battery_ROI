@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useDataStore } from '@/store/dataStore'
 import { useTariffStore } from '@/store/tariffStore'
@@ -6,14 +6,14 @@ import { useUiStore } from '@/store/uiStore'
 import { MeterUploader } from '@/components/import/MeterUploader'
 import { MonthlyBarChart } from '@/components/analytics/MonthlyBarChart'
 import { Button } from '@/components/ui/button'
-import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { calculateCost } from '@/lib/tariffCalculator'
-import { simulateBattery } from '@/lib/batterySimulator'
 import { detectOvernightLoadPattern } from '@/lib/dataProcessor'
-import { STATE_DEFAULTS } from '@/lib/stateDefaults'
 import { parseMeterCsv } from '@/lib/csvParser'
 import type { TariffPlan } from '@/types/tariff'
-import { CheckCircle2, AlertTriangle, XCircle } from 'lucide-react'
+import type { HouseholdProfile } from '@/types/meter'
 
 interface SimpleAnalysis {
   monthlyImportKwh: number
@@ -25,26 +25,42 @@ interface SimpleAnalysis {
   overnightCostPerNight: number
   overnightCostPerYear: number
   lowestImportRate: number
-  roughAnnualSavingsLow: number
-  roughAnnualSavingsHigh: number
-  roughPaybackLow: number
-  roughPaybackHigh: number
-  verdict: 'green' | 'amber' | 'red'
   highestImportRate: number
   feedInRate: number
 }
 
-function buildStateDefaultPlan(state: keyof typeof STATE_DEFAULTS): TariffPlan {
-  const rates = STATE_DEFAULTS[state]
+function buildQuickRatePlan(quickRate: NonNullable<HouseholdProfile['quickRate']>, state: HouseholdProfile['state']): TariffPlan {
   const everyday = [true, true, true, true, true, true, true]
   return {
-    id: 'state-default',
-    name: `${state} state default (approximate)`,
+    id: 'quick-rate',
+    name: 'Your average rate (quick estimate)',
     provider: '',
     state,
-    fixedCharges: [{ id: 'sd-1', label: 'Supply charge', amountPerDay: rates.supplyPerDay, gstInclusive: true }],
-    periods: [{ id: 'sd-2', name: 'Flat rate', startTime: '00:00', endTime: '00:00', ratePerKwh: rates.peakRate, days: everyday }],
-    feedInPeriods: [{ id: 'sd-3', name: 'FiT', startTime: '00:00', endTime: '00:00', ratePerKwh: rates.fitRate, days: everyday }],
+    fixedCharges: quickRate.dailySupplyDollars
+      ? [{ id: 'qr-1', label: 'Supply charge', amountPerDay: quickRate.dailySupplyDollars, gstInclusive: true }]
+      : [],
+    periods: [
+      {
+        id: 'qr-2',
+        name: 'Flat rate',
+        startTime: '00:00',
+        endTime: '00:00',
+        ratePerKwh: (quickRate.importCentsPerKwh ?? 0) / 100,
+        gstInclusive: true,
+        days: everyday,
+      },
+    ],
+    feedInPeriods: [
+      {
+        id: 'qr-3',
+        name: 'FiT',
+        startTime: '00:00',
+        endTime: '00:00',
+        ratePerKwh: (quickRate.feedInCentsPerKwh ?? 0) / 100,
+        gstInclusive: true,
+        days: everyday,
+      },
+    ],
     controlledLoadRate: null,
     controlledLoad2Rate: null,
     publicHolidaysAsWeekends: false,
@@ -54,49 +70,20 @@ function buildStateDefaultPlan(state: keyof typeof STATE_DEFAULTS): TariffPlan {
   }
 }
 
-function defaultQuickQuote(): Parameters<typeof simulateBattery>[1] {
-  return {
-    id: 'quick-estimate',
-    name: 'Quick estimate',
-    capacityKwh: 10,
-    maxChargeKw: 5,
-    maxDischargeKw: 5,
-    roundTripEfficiency: 0.9,
-    totalCostAud: 12000,
-    warrantyYears: 10,
-    warrantyThroughputMwh: null,
-    lifetimeYears: 10,
-    totalDegradationPercent: 30,
-    maxDischargePercent: 80,
-    reservePercent: 10,
-    targetMinDischargePct: 60,
-    targetMaxDischargePct: 90,
-    backupCapable: false,
-    chargePriority: 'solar_then_offpeak',
-    dischargePriority: 'peak_only',
-    arbitrageTargetPercent: 80,
-    arbitrageStartTime: '23:00',
-    arbitrageEndTime: '07:00',
-    solarSystemKw: null,
-    inverterKw: null,
-    exportLimitKw: null,
-    vppEnrolled: false,
-    vppAnnualCreditAud: 0,
-  }
-}
-
 export function SimpleModePage() {
   const summary = useDataStore((s) => s.summary)
   const intervals = useDataStore((s) => s.intervals)
   const householdProfile = useDataStore((s) => s.householdProfile)
+  const setProfile = useDataStore((s) => s.setProfile)
   const plans = useTariffStore((s) => s.plans)
   const setMode = useUiStore((s) => s.setMode)
   const navigate = useNavigate()
   const setMeterBuckets = useDataStore((s) => s.setMeterBuckets)
 
   const activePlan = plans.find((p) => p.isActive)
-  const usingStateDefault = !activePlan
-  const plan = activePlan ?? buildStateDefaultPlan(householdProfile.state)
+  const hasQuickRate = householdProfile.quickRate.importCentsPerKwh != null
+  const usingQuickRate = !activePlan && hasQuickRate
+  const plan = activePlan ?? (hasQuickRate ? buildQuickRatePlan(householdProfile.quickRate, householdProfile.state) : null)
 
   const loadSample = async () => {
     const res = await fetch('/sample/sample-meter.csv')
@@ -106,7 +93,7 @@ export function SimpleModePage() {
   }
 
   const analysis = useMemo((): SimpleAnalysis | null => {
-    if (!summary || intervals.length === 0) return null
+    if (!summary || intervals.length === 0 || !plan) return null
 
     const cost = calculateCost(intervals, plan)
     const months = Math.max(1, summary.totalDays / 30.44)
@@ -123,17 +110,6 @@ export function SimpleModePage() {
     const overnightCostPerNight = overnight.avgNightlyKwh * lowestImportRate
     const overnightCostPerYear = overnightCostPerNight * 365
 
-    const quickResult = simulateBattery(intervals, defaultQuickQuote(), plan)
-    const roughAnnualSavingsLow = quickResult.annualSavingsAud * 0.75
-    const roughAnnualSavingsHigh = quickResult.annualSavingsAud * 1.35
-    const roughPaybackLow = roughAnnualSavingsHigh > 0 ? 12000 / roughAnnualSavingsHigh : Number.POSITIVE_INFINITY
-    const roughPaybackHigh = roughAnnualSavingsLow > 0 ? 12000 / roughAnnualSavingsLow : Number.POSITIVE_INFINITY
-
-    let verdict: 'green' | 'amber' | 'red'
-    if (monthlyExportKwh < 30) verdict = 'red'
-    else if (roughPaybackHigh > 20) verdict = 'amber'
-    else verdict = 'green'
-
     return {
       monthlyImportKwh,
       monthlyImportCost,
@@ -144,11 +120,6 @@ export function SimpleModePage() {
       overnightCostPerNight,
       overnightCostPerYear,
       lowestImportRate,
-      roughAnnualSavingsLow,
-      roughAnnualSavingsHigh,
-      roughPaybackLow,
-      roughPaybackHigh,
-      verdict,
       highestImportRate,
       feedInRate,
     }
@@ -175,6 +146,16 @@ export function SimpleModePage() {
     )
   }
 
+  if (!plan) {
+    return (
+      <div className="mx-auto max-w-2xl">
+        <QuickRateForm
+          onSave={(quickRate) => setProfile({ quickRate })}
+        />
+      </div>
+    )
+  }
+
   if (!analysis) return null
 
   return (
@@ -191,9 +172,10 @@ export function SimpleModePage() {
             <CardDescription>
               ${analysis.monthlyImportCost.toFixed(0)} / month - ${(analysis.monthlyImportCost * 12).toFixed(0)} / year
             </CardDescription>
-            {usingStateDefault && (
+            {usingQuickRate && (
               <p className="mt-1 text-xs text-muted-foreground">
-                Using approximate {plan.state} rates - configure your tariff for accuracy.
+                Using your average rate ({(analysis.lowestImportRate * 100).toFixed(1)}c/kWh) - set up a full tariff
+                plan in Advanced mode for accuracy.
               </p>
             )}
           </CardHeader>
@@ -246,16 +228,14 @@ export function SimpleModePage() {
         )}
       </div>
 
-      <VerdictCard analysis={analysis} />
-
       <MonthlyBarChart intervals={intervals} simple />
 
       <Card>
         <CardHeader>
-          <CardTitle>Ready for a real number?</CardTitle>
+          <CardTitle>Want to know if a battery pays off?</CardTitle>
           <CardDescription>
-            Enter your battery quote in Advanced mode for an accurate payback calculation based on your actual usage
-            data.
+            Enter a real battery quote in Advanced mode for an accurate savings and payback estimate based on your
+            actual usage data.
           </CardDescription>
           <Button
             className="mt-3 w-fit"
@@ -275,67 +255,47 @@ export function SimpleModePage() {
   )
 }
 
-function VerdictCard({ analysis }: { analysis: SimpleAnalysis }) {
-  if (analysis.verdict === 'green') {
-    return (
-      <Card className="border-green-600">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base">
-            <CheckCircle2 className="h-5 w-5 text-green-600" /> A battery looks worthwhile for your usage
-          </CardTitle>
-          <CardDescription className="space-y-1">
-            <p>
-              You export {analysis.monthlyExportKwh.toFixed(0)} kWh/month of solar but buy back{' '}
-              {analysis.monthlyImportKwh.toFixed(0)} kWh. A battery could self-consume a large share of that instead.
-            </p>
-            <p>
-              Rough annual saving: ${analysis.roughAnnualSavingsLow.toFixed(0)} - ${analysis.roughAnnualSavingsHigh.toFixed(0)}
-            </p>
-            <p>Typical battery cost: $10,000 - $14,000</p>
-            <p>
-              Rough payback: {Number.isFinite(analysis.roughPaybackLow) ? analysis.roughPaybackLow.toFixed(0) : '?'} -{' '}
-              {Number.isFinite(analysis.roughPaybackHigh) ? analysis.roughPaybackHigh.toFixed(0) : '?'} years
-            </p>
-            <p className="pt-1 text-xs">Use Advanced mode for an accurate figure from a real quote.</p>
-          </CardDescription>
-        </CardHeader>
-      </Card>
-    )
-  }
+function QuickRateForm({ onSave }: { onSave: (quickRate: HouseholdProfile['quickRate']) => void }) {
+  const [importCents, setImportCents] = useState('')
+  const [feedInCents, setFeedInCents] = useState('')
+  const [supplyDollars, setSupplyDollars] = useState('')
 
-  if (analysis.verdict === 'amber') {
-    return (
-      <Card className="border-amber-500">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base">
-            <AlertTriangle className="h-5 w-5 text-amber-500" /> A battery might work - it depends on the price
-          </CardTitle>
-          <CardDescription className="space-y-1">
-            <p>
-              Rough annual saving: ${analysis.roughAnnualSavingsLow.toFixed(0)} - ${analysis.roughAnnualSavingsHigh.toFixed(0)}
-            </p>
-            <p>
-              Rough payback: {Number.isFinite(analysis.roughPaybackLow) ? analysis.roughPaybackLow.toFixed(0) : '20+'} -{' '}
-              {Number.isFinite(analysis.roughPaybackHigh) ? `${analysis.roughPaybackHigh.toFixed(0)}+` : '35+'} years
-            </p>
-            <p className="pt-1 text-xs">Marginal at current prices. Advanced mode can check a specific quote.</p>
-          </CardDescription>
-        </CardHeader>
-      </Card>
-    )
+  const submit = () => {
+    const importVal = Number.parseFloat(importCents)
+    if (!importVal || importVal <= 0) return
+    onSave({
+      importCentsPerKwh: importVal,
+      feedInCentsPerKwh: feedInCents ? Number.parseFloat(feedInCents) || 0 : 0,
+      dailySupplyDollars: supplyDollars ? Number.parseFloat(supplyDollars) || 0 : 0,
+    })
   }
 
   return (
-    <Card className="border-destructive">
+    <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-base">
-          <XCircle className="h-5 w-5 text-destructive" /> A battery is hard to justify at current prices
-        </CardTitle>
-        <CardDescription className="space-y-1">
-          <p>{analysis.monthlyExportKwh < 5 ? "You don't have much solar export to work with." : 'Your solar export is too low to justify a battery.'}</p>
-          <p>A battery may still make sense for blackout backup or a VPP program.</p>
+        <CardTitle>What's your average electricity rate?</CardTitle>
+        <CardDescription>
+          We use this for a quick cost estimate. Check your latest bill for a c/kWh usage rate - a rough figure is
+          fine. For an accurate time-of-use breakdown, set up a full tariff plan in Advanced mode instead.
         </CardDescription>
       </CardHeader>
+      <CardContent className="space-y-4">
+        <div>
+          <Label>Average usage rate (c/kWh)</Label>
+          <Input type="number" step="0.1" value={importCents} onChange={(e) => setImportCents(e.target.value)} placeholder="e.g. 32" />
+        </div>
+        <div>
+          <Label>Solar feed-in rate (c/kWh, optional)</Label>
+          <Input type="number" step="0.1" value={feedInCents} onChange={(e) => setFeedInCents(e.target.value)} placeholder="e.g. 6" />
+        </div>
+        <div>
+          <Label>Daily supply charge ($, optional)</Label>
+          <Input type="number" step="0.01" value={supplyDollars} onChange={(e) => setSupplyDollars(e.target.value)} placeholder="e.g. 0.95" />
+        </div>
+        <Button onClick={submit} disabled={!importCents}>
+          Continue
+        </Button>
+      </CardContent>
     </Card>
   )
 }

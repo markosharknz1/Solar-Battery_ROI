@@ -63,6 +63,12 @@ export interface HouseholdProfile {
   }
   hasPool: boolean
   hasLargeDucted: boolean
+  /** User-entered flat rate for Simple mode, used until a real tariff plan is set up. */
+  quickRate: {
+    importCentsPerKwh: number | null
+    feedInCentsPerKwh: number | null
+    dailySupplyDollars: number | null
+  }
 }
 
 export function defaultHouseholdProfile(): HouseholdProfile {
@@ -87,5 +93,6 @@ export function defaultHouseholdProfile(): HouseholdProfile {
     },
     hasPool: false,
     hasLargeDucted: false,
+    quickRate: { importCentsPerKwh: null, feedInCentsPerKwh: null, dailySupplyDollars: null },
   }
 }

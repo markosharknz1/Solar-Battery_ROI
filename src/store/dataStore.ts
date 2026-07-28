@@ -53,6 +53,7 @@ export const useDataStore = create<DataStore>()(
     }),
     {
       name: 'sba_household',
+      version: 1,
       partialize: (state) => ({ householdProfile: state.householdProfile }),
     },
   ),

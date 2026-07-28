@@ -1,12 +1,10 @@
 import { useState } from 'react'
 import type { TariffPlan } from '@/types/tariff'
 import { useTariffStore } from '@/store/tariffStore'
-import { TARIFF_PRESETS } from '@/lib/tariffPresets'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { TariffEditor } from '@/components/tariffs/TariffEditor'
 import { Plus } from 'lucide-react'
 
@@ -24,6 +22,7 @@ function blankPlan(): TariffPlan {
         startTime: '00:00',
         endTime: '00:00',
         ratePerKwh: 0.3,
+        gstInclusive: true,
         days: [true, true, true, true, true, true, true],
       },
     ],
@@ -34,6 +33,7 @@ function blankPlan(): TariffPlan {
         startTime: '00:00',
         endTime: '00:00',
         ratePerKwh: 0.05,
+        gstInclusive: true,
         days: [true, true, true, true, true, true, true],
       },
     ],
@@ -71,12 +71,6 @@ export function TariffList() {
     addPlan({ ...plan, id: crypto.randomUUID(), name: `${plan.name} (copy)`, createdAt: new Date().toISOString(), isActive: false })
   }
 
-  const loadPreset = (presetId: string) => {
-    const preset = TARIFF_PRESETS.find((p) => p.id === presetId)
-    if (!preset) return
-    addPlan({ id: crypto.randomUUID(), createdAt: new Date().toISOString(), isActive: false, ...preset.build() })
-  }
-
   const save = (plan: TariffPlan) => {
     if (isNew) addPlan(plan)
     else updatePlan(plan.id, plan)
@@ -89,18 +83,6 @@ export function TariffList() {
         <Button onClick={openNew}>
           <Plus className="mr-1 h-4 w-4" /> Add new plan
         </Button>
-        <Select onValueChange={loadPreset}>
-          <SelectTrigger className="w-56">
-            <SelectValue placeholder="Load preset..." />
-          </SelectTrigger>
-          <SelectContent>
-            {TARIFF_PRESETS.map((p) => (
-              <SelectItem key={p.id} value={p.id}>
-                {p.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">

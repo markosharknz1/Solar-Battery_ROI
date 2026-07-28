@@ -20,6 +20,7 @@ const blankPeriod = (rate = 0.3) => ({
   startTime: '00:00',
   endTime: '00:00',
   ratePerKwh: rate,
+  gstInclusive: true,
   days: [true, true, true, true, true, true, true],
 })
 

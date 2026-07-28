@@ -29,7 +29,8 @@ function resolveFromPeriods(periods: RatePeriod[], weekday: number, slot: number
   const chosen = matched ?? periods[0]
 
   if (!chosen) return { ratePerKwh: 0, periodName: 'No rate defined', isFree: true }
-  return { ratePerKwh: chosen.ratePerKwh, periodName: chosen.name, isFree: chosen.ratePerKwh <= 0 }
+  const effectiveRate = chosen.gstInclusive ? chosen.ratePerKwh : chosen.ratePerKwh * 1.1
+  return { ratePerKwh: effectiveRate, periodName: chosen.name, isFree: chosen.ratePerKwh <= 0 }
 }
 
 export function resolveRate(plan: TariffPlan, interval: Interval): ResolvedRate {

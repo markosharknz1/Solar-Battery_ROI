@@ -1,7 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { ProviderQuote, TariffPlan } from '@/types/tariff'
-import { TARIFF_PRESETS } from '@/lib/tariffPresets'
 
 interface TariffStore {
   plans: TariffPlan[]
@@ -16,20 +15,10 @@ interface TariffStore {
   deleteProviderQuote: (id: string) => void
 }
 
-function fromPreset(presetId: string): TariffPlan {
-  const preset = TARIFF_PRESETS.find((p) => p.id === presetId)!
-  return {
-    id: crypto.randomUUID(),
-    createdAt: new Date().toISOString(),
-    isActive: false,
-    ...preset.build(),
-  }
-}
-
 export const useTariffStore = create<TariffStore>()(
   persist(
     (set, get) => ({
-      plans: [fromPreset('sa-flat'), fromPreset('sa-tou')],
+      plans: [],
       activePlanId: null,
       providerQuotes: [],
       addPlan: (plan) => set({ plans: [...get().plans, plan] }),
@@ -50,6 +39,6 @@ export const useTariffStore = create<TariffStore>()(
         set({ providerQuotes: get().providerQuotes.map((q) => (q.id === id ? { ...q, ...updates } : q)) }),
       deleteProviderQuote: (id) => set({ providerQuotes: get().providerQuotes.filter((q) => q.id !== id) }),
     }),
-    { name: 'sba_tariffs_v2', version: 2 },
+    { name: 'sba_tariffs_v2', version: 3 },
   ),
 )
