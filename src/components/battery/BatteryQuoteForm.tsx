@@ -41,12 +41,16 @@ function blankQuote(): BatteryQuote {
 
 export function BatteryQuoteForm({
   onRun,
+  initialQuote,
+  initialTariffId,
 }: {
   onRun: (quote: BatteryQuote, tariffId: string) => void
+  initialQuote?: BatteryQuote
+  initialTariffId?: string
 }) {
-  const [quote, setQuote] = useState<BatteryQuote>(blankQuote())
+  const [quote, setQuote] = useState<BatteryQuote>(initialQuote ?? blankQuote())
   const plans = useTariffStore((s) => s.plans)
-  const [tariffId, setTariffId] = useState<string>(plans[0]?.id ?? '')
+  const [tariffId, setTariffId] = useState<string>(initialTariffId ?? plans[0]?.id ?? '')
 
   const update = (updates: Partial<BatteryQuote>) => setQuote((q) => ({ ...q, ...updates }))
 

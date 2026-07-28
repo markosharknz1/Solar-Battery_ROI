@@ -66,7 +66,12 @@ export function BatteryPage() {
 
         <TabsContent value="configure">
           <div className="grid gap-6 lg:grid-cols-[380px_1fr]">
-            <BatteryQuoteForm onRun={runSimulation} />
+            <BatteryQuoteForm
+              key={current?.quote.id ?? 'blank'}
+              onRun={runSimulation}
+              initialQuote={current?.quote}
+              initialTariffId={current?.plan.id}
+            />
             <div>
               {current ? (
                 <BatteryResults result={current.result} quote={current.quote} plan={current.plan} totalDays={summary?.totalDays ?? 1} />
