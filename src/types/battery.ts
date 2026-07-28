@@ -1,13 +1,3 @@
-export interface RebatePreset {
-  id: string
-  name: string // e.g. "Federal Cheaper Home Batteries Program"
-  jurisdiction: string // e.g. "Federal", "VIC", "NSW"
-  description: string
-  /** Flat rebate amount in AUD, or a $/kWh discount applied to capacity at edit time */
-  amountAud?: number
-  perKwhAud?: number
-}
-
 export interface BatteryQuote {
   id: string
   name: string // e.g. "Tesla Powerwall 2 quote"
@@ -19,9 +9,7 @@ export interface BatteryQuote {
   roundTripEfficiency: number // 0-1, typically 0.90
 
   // Cost
-  totalCostAud: number // installed cost
-  rebatePresetIds?: string[]
-  governmentRebatesAud: number // subtracted for payback calc
+  totalCostAud: number // installed cost - enter the final price after any rebates/incentives already applied
 
   // Warranty
   warrantyYears: number
@@ -112,4 +100,25 @@ export interface BatterySimResult {
   importCostSavedAud: number
   exportCreditLostAud: number
   fixedChargesAud: number
+}
+
+/** One slot of a synthetic "typical day" built by averaging real intervals - used by the
+ * Strategy Planner's instant preview, not the full simulator. */
+export interface AverageDaySlot {
+  slot: number
+  time: string // 'HH:MM'
+  avgGridImport: number
+  avgGridExport: number
+  avgSolarGen: number
+  avgHomeLoad: number
+  tariffRate: number
+  fitRate: number
+  projectedSoc: number // filled by previewStrategyOnAverageDay()
+}
+
+export interface ChargeWindow {
+  id: string
+  fromTime: string
+  toTime: string
+  targetPercent: number
 }

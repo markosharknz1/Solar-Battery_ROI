@@ -6,9 +6,11 @@ import { useTariffStore } from '@/store/tariffStore'
 import { useBatteryStore } from '@/store/batteryStore'
 import { BatteryQuoteForm } from '@/components/battery/BatteryQuoteForm'
 import { BatteryResults } from '@/components/battery/BatteryResults'
+import { StrategyPlanner } from '@/components/battery/StrategyPlanner'
 import { simulateBattery } from '@/lib/batterySimulator'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Button } from '@/components/ui/button'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import type { BatteryQuote, BatterySimResult } from '@/types/battery'
 import type { TariffPlan } from '@/types/tariff'
 
@@ -23,6 +25,7 @@ export function BatteryPage() {
   const setResult = useBatteryStore((s) => s.setResult)
 
   const [current, setCurrent] = useState<{ quote: BatteryQuote; plan: TariffPlan; result: BatterySimResult } | null>(null)
+  const [topTab, setTopTab] = useState('strategy')
 
   const runSimulation = (quote: BatteryQuote, tariffId: string) => {
     const plan = plans.find((p) => p.id === tariffId)
@@ -31,6 +34,11 @@ export function BatteryPage() {
     addQuote(quote)
     setResult(`${quote.id}_${tariffId}`, result)
     setCurrent({ quote, plan, result })
+  }
+
+  const applyFromPlanner = (quote: BatteryQuote, tariffId: string) => {
+    runSimulation(quote, tariffId)
+    setTopTab('configure')
   }
 
   return (
@@ -45,16 +53,30 @@ export function BatteryPage() {
           Import a smart meter CSV to use this page.
         </p>
       )}
-      <div className="grid gap-6 lg:grid-cols-[380px_1fr]">
-        <BatteryQuoteForm onRun={runSimulation} />
-        <div>
-          {current ? (
-            <BatteryResults result={current.result} quote={current.quote} plan={current.plan} totalDays={summary?.totalDays ?? 1} />
-          ) : (
-            <p className="text-sm text-muted-foreground">Configure a quote and run a simulation to see results.</p>
-          )}
-        </div>
-      </div>
+
+      <Tabs value={topTab} onValueChange={setTopTab} className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="strategy">Strategy planner</TabsTrigger>
+          <TabsTrigger value="configure">Configure &amp; simulate</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="strategy">
+          <StrategyPlanner intervals={intervals} plans={plans} onApplyAndRun={applyFromPlanner} />
+        </TabsContent>
+
+        <TabsContent value="configure">
+          <div className="grid gap-6 lg:grid-cols-[380px_1fr]">
+            <BatteryQuoteForm onRun={runSimulation} />
+            <div>
+              {current ? (
+                <BatteryResults result={current.result} quote={current.quote} plan={current.plan} totalDays={summary?.totalDays ?? 1} />
+              ) : (
+                <p className="text-sm text-muted-foreground">Configure a quote and run a simulation to see results.</p>
+              )}
+            </div>
+          </div>
+        </TabsContent>
+      </Tabs>
 
       {quotes.length > 0 && (
         <div className="mt-8">

@@ -1,10 +1,15 @@
-import { useMemo, useState } from 'react'
+import { Fragment, useMemo, useState } from 'react'
 import type { Interval } from '@/types/meter'
 import { sequentialScale, useIsDarkMode } from '@/lib/colorScale'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
 const WEEKDAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 type Metric = 'usage' | 'export' | 'net'
+
+// Shared column template so the cell grid and the time-label row are guaranteed to
+// align by construction (both are the same CSS grid, not two independently-sized rows).
+const GRID_TEMPLATE_COLUMNS = '2rem repeat(48, 12px)'
+const LABEL_SLOTS: Record<number, string> = { 0: '00:00', 12: '06:00', 24: '12:00', 36: '18:00', 47: '23:30' }
 
 function metricValue(i: Interval, metric: Metric): number {
   if (metric === 'usage') return i.gridImport
@@ -17,6 +22,14 @@ function slotLabel(slot: number): string {
   const h = Math.floor(totalMin / 60)
   const m = totalMin % 60
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
+}
+
+/** 95th-percentile normalization so one outlier day/slot doesn't wash out the whole colour range. */
+function percentile(values: number[], p: number): number {
+  const positive = values.filter((v) => v > 0).sort((a, b) => a - b)
+  if (positive.length === 0) return 1
+  const idx = Math.min(positive.length - 1, Math.floor(positive.length * p))
+  return positive[idx] || 1
 }
 
 export function UsageHeatmap({
@@ -32,22 +45,16 @@ export function UsageHeatmap({
   )
   const isDark = useIsDarkMode()
 
-  const { grid, max } = useMemo(() => {
+  const { grid, p95 } = useMemo(() => {
     const sums = Array.from({ length: 7 }, () => Array(48).fill(0))
     const counts = Array.from({ length: 7 }, () => Array(48).fill(0))
     for (const i of intervals) {
       sums[i.weekday][i.slot] += metricValue(i, metric)
       counts[i.weekday][i.slot] += 1
     }
-    let maxVal = 0
-    const grid = sums.map((row, w) =>
-      row.map((sum, s) => {
-        const avg = counts[w][s] > 0 ? sum / counts[w][s] : 0
-        maxVal = Math.max(maxVal, avg)
-        return avg
-      }),
-    )
-    return { grid, max: maxVal || 1 }
+    const grid = sums.map((row, w) => row.map((sum, s) => (counts[w][s] > 0 ? sum / counts[w][s] : 0)))
+    const p95 = percentile(grid.flat(), 0.95)
+    return { grid, p95 }
   }, [intervals, metric])
 
   const isInEvWindow = (slot: number) => {
@@ -81,34 +88,37 @@ export function UsageHeatmap({
       </div>
 
       <div className="overflow-x-auto">
-        <div className="inline-block" role="img" aria-label={`Heatmap of average ${metric} by weekday and time of day`}>
+        <div
+          className="inline-grid items-center gap-[2px]"
+          style={{ gridTemplateColumns: GRID_TEMPLATE_COLUMNS }}
+          role="img"
+          aria-label={`Heatmap of average ${metric} by weekday and time of day`}
+        >
           {grid.map((row, w) => (
-            <div key={w} className="flex items-center gap-[2px]">
-              <span className="w-8 shrink-0 text-xs text-[var(--viz-text-muted)]">{WEEKDAY_LABELS[w]}</span>
+            <Fragment key={w}>
+              <span className="text-xs text-[var(--viz-text-muted)]">{WEEKDAY_LABELS[w]}</span>
               {row.map((value, s) => (
                 <div
                   key={s}
-                  className="h-4 w-3 shrink-0"
+                  className="h-4 w-3"
                   style={{
-                    backgroundColor: sequentialScale(value / max, isDark),
+                    backgroundColor: sequentialScale(Math.min(1, value / p95), isDark),
                     borderBottom: isInEvWindow(s) ? '2px solid var(--viz-series-4)' : undefined,
                   }}
-                  onMouseEnter={(e) =>
-                    setHover({ x: e.clientX, y: e.clientY, weekday: w, slot: s, value })
-                  }
+                  onMouseEnter={(e) => setHover({ x: e.clientX, y: e.clientY, weekday: w, slot: s, value })}
                   onMouseMove={(e) => setHover((h) => (h ? { ...h, x: e.clientX, y: e.clientY } : h))}
                   onMouseLeave={() => setHover(null)}
                 />
               ))}
-            </div>
+            </Fragment>
           ))}
-          <div className="mt-1 flex pl-8 text-[10px] text-[var(--viz-text-muted)]">
-            {[0, 6, 12, 18, 23].map((h) => (
-              <span key={h} style={{ width: `${(6 * 48) / 5}px` }}>
-                {String(h).padStart(2, '0')}:00
-              </span>
-            ))}
-          </div>
+
+          <span />
+          {Array.from({ length: 48 }, (_, s) => (
+            <span key={`time-${s}`} className="text-[10px] text-[var(--viz-text-muted)]">
+              {LABEL_SLOTS[s] ?? ''}
+            </span>
+          ))}
         </div>
       </div>
 

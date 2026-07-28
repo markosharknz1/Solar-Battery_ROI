@@ -22,6 +22,9 @@ interface SimpleAnalysis {
   monthlyExportCredit: number
   opportunityCost: number
   overnight: ReturnType<typeof detectOvernightLoadPattern>
+  overnightCostPerNight: number
+  overnightCostPerYear: number
+  lowestImportRate: number
   roughAnnualSavingsLow: number
   roughAnnualSavingsHigh: number
   roughPaybackLow: number
@@ -60,13 +63,11 @@ function defaultQuickQuote(): Parameters<typeof simulateBattery>[1] {
     maxDischargeKw: 5,
     roundTripEfficiency: 0.9,
     totalCostAud: 12000,
-    rebatePresetIds: [],
-    governmentRebatesAud: 0,
     warrantyYears: 10,
     warrantyThroughputMwh: null,
     lifetimeYears: 10,
-    totalDegradationPercent: 20,
-    maxDischargePercent: 100,
+    totalDegradationPercent: 30,
+    maxDischargePercent: 80,
     reservePercent: 10,
     targetMinDischargePct: 60,
     targetMaxDischargePct: 90,
@@ -115,9 +116,12 @@ export function SimpleModePage() {
     const feedInRate = plan.feedInPeriods[0]?.ratePerKwh ?? 0
     const monthlyExportCredit = monthlyExportKwh * feedInRate
     const highestImportRate = Math.max(...plan.periods.map((p) => p.ratePerKwh), 0)
+    const lowestImportRate = Math.min(...plan.periods.map((p) => p.ratePerKwh))
     const opportunityCost = monthlyExportKwh * highestImportRate
 
     const overnight = detectOvernightLoadPattern(intervals)
+    const overnightCostPerNight = overnight.avgNightlyKwh * lowestImportRate
+    const overnightCostPerYear = overnightCostPerNight * 365
 
     const quickResult = simulateBattery(intervals, defaultQuickQuote(), plan)
     const roughAnnualSavingsLow = quickResult.annualSavingsAud * 0.75
@@ -137,6 +141,9 @@ export function SimpleModePage() {
       monthlyExportCredit,
       opportunityCost,
       overnight,
+      overnightCostPerNight,
+      overnightCostPerYear,
+      lowestImportRate,
       roughAnnualSavingsLow,
       roughAnnualSavingsHigh,
       roughPaybackLow,
@@ -212,16 +219,28 @@ export function SimpleModePage() {
           <Card>
             <CardHeader>
               <CardTitle className="text-base">🌙 Cheap overnight usage</CardTitle>
-              <p className="text-2xl font-semibold">{analysis.overnight.overnightAvgKwh.toFixed(1)} kWh / night avg</p>
+              <p className="text-2xl font-semibold">{analysis.overnight.avgNightlyKwh.toFixed(1)} kWh / night avg</p>
               <CardDescription>
-                {(householdProfile.overnightLoads.evCharger || householdProfile.overnightLoads.airConOvernight) &&
-                  [
+                ${analysis.overnightCostPerNight.toFixed(2)} / night (at {(analysis.lowestImportRate * 100).toFixed(0)}c) - $
+                {analysis.overnightCostPerYear.toFixed(0)} / year
+              </CardDescription>
+              {(householdProfile.overnightLoads.evCharger || householdProfile.overnightLoads.airConOvernight) && (
+                <p className="text-sm">
+                  {[
                     householdProfile.overnightLoads.evCharger && 'EV charging',
                     householdProfile.overnightLoads.airConOvernight && 'air conditioning',
                   ]
                     .filter(Boolean)
-                    .join(' + ') + ' detected'}
-              </CardDescription>
+                    .join(' + ')}{' '}
+                  detected
+                </p>
+              )}
+              {analysis.lowestImportRate <= 0.12 && (
+                <p className="mt-1 text-xs text-muted-foreground">
+                  You're already on the cheapest rate for this usage. A battery is better used to offset peak-rate
+                  consumption.
+                </p>
+              )}
             </CardHeader>
           </Card>
         )}

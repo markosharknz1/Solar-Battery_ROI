@@ -1,5 +1,8 @@
 import type { DataSeasonality, DataSummary, Interval } from '@/types/meter'
 import type { MeterBucket, SolarDailyTotal } from '@/lib/csvParser'
+import type { TariffPlan } from '@/types/tariff'
+import type { AverageDaySlot } from '@/types/battery'
+import { resolveRate, resolveFeedInRate } from '@/lib/tariffCalculator'
 
 const SLOTS_PER_DAY = 48
 
@@ -126,7 +129,8 @@ export function computeSeasonality(intervals: Interval[]): DataSeasonality {
  * average usage ratio. A ratio > 2.0 suggests a large controlled load (EV, hot water, aircon) running overnight.
  */
 export function detectOvernightLoadPattern(intervals: Interval[]): {
-  overnightAvgKwh: number
+  overnightAvgKwh: number // avg per 30-min slot in the overnight window - for the significance ratio
+  avgNightlyKwh: number // avg TOTAL kWh per night (10pm-6am summed) - for display
   middayAvgKwh: number
   overnightToMiddayRatio: number
   isSignificant: boolean
@@ -135,25 +139,42 @@ export function detectOvernightLoadPattern(intervals: Interval[]): {
   let overnightCount = 0
   let middaySum = 0
   let middayCount = 0
+  // Group by "night": the evening half (slots 44-47, same date) and the following
+  // morning half (slots 0-11, next date) belong to the same night.
+  const nightlyTotals = new Map<string, number>()
 
   for (const i of intervals) {
-    const isOvernight = i.slot >= 44 || i.slot <= 11
+    const isEveningHalf = i.slot >= 44
+    const isMorningHalf = i.slot <= 11
     const isMidday = i.slot >= 12 && i.slot <= 35
-    if (isOvernight) {
-      overnightSum += i.gridImport + i.cl1Import + i.cl2Import
+    const overnightKwh = i.gridImport + i.cl1Import + i.cl2Import
+
+    if (isEveningHalf || isMorningHalf) {
+      overnightSum += overnightKwh
       overnightCount++
+
+      let nightKey = i.dateStr
+      if (isMorningHalf) {
+        const prevDate = new Date(i.date)
+        prevDate.setDate(prevDate.getDate() - 1)
+        nightKey = `${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, '0')}-${String(prevDate.getDate()).padStart(2, '0')}`
+      }
+      nightlyTotals.set(nightKey, (nightlyTotals.get(nightKey) ?? 0) + overnightKwh)
     } else if (isMidday) {
-      middaySum += i.gridImport + i.cl1Import + i.cl2Import
+      middaySum += overnightKwh
       middayCount++
     }
   }
 
   const overnightAvgKwh = overnightCount > 0 ? overnightSum / overnightCount : 0
+  const nights = Array.from(nightlyTotals.values())
+  const avgNightlyKwh = nights.length > 0 ? nights.reduce((a, v) => a + v, 0) / nights.length : 0
   const middayAvgKwh = middayCount > 0 ? middaySum / middayCount : 0
   const ratio = middayAvgKwh > 0 ? overnightAvgKwh / middayAvgKwh : overnightAvgKwh > 0 ? Number.POSITIVE_INFINITY : 0
 
   return {
     overnightAvgKwh,
+    avgNightlyKwh,
     middayAvgKwh,
     overnightToMiddayRatio: ratio,
     isSignificant: ratio > 2.0,
@@ -248,4 +269,68 @@ export function buildFlatEstimateIntervals(
   }
 
   return intervals
+}
+
+/**
+ * Averages real intervals into a single synthetic 48-slot "typical day", used by the
+ * Strategy Planner's instant preview. Rate resolution uses a representative weekday
+ * (Monday for all/weekday, Saturday for weekend) since this is a single averaged day,
+ * not tied to any specific calendar date - the full battery simulator resolves rates
+ * per real interval and is the source of truth for an actual simulation.
+ */
+export function computeAverageDay(
+  intervals: Interval[],
+  plan: TariffPlan,
+  filter: 'all' | 'weekday' | 'weekend' = 'all',
+): AverageDaySlot[] {
+  const filtered = intervals.filter((i) => {
+    if (filter === 'weekday') return i.weekday < 5
+    if (filter === 'weekend') return i.weekday >= 5
+    return true
+  })
+
+  const sums = Array.from({ length: SLOTS_PER_DAY }, () => ({ gridImport: 0, gridExport: 0, solarGen: 0, homeLoad: 0, count: 0 }))
+  for (const i of filtered) {
+    const s = sums[i.slot]
+    s.gridImport += i.gridImport
+    s.gridExport += i.gridExport
+    s.solarGen += i.solarGen
+    s.homeLoad += i.homeLoad
+    s.count++
+  }
+
+  const representativeWeekday = filter === 'weekend' ? 5 : 0
+  const referenceDate = new Date(2024, 0, 1 + representativeWeekday) // a Monday-based reference week
+
+  return Array.from({ length: SLOTS_PER_DAY }, (_, slot) => {
+    const s = sums[slot]
+    const { hour, minute } = slotToHourMinute(slot)
+    const syntheticInterval: Interval = {
+      date: referenceDate,
+      dateStr: '2024-01-01',
+      slot,
+      hour,
+      minute,
+      weekday: representativeWeekday as 0 | 1 | 2 | 3 | 4 | 5 | 6,
+      gridImport: 0,
+      gridExport: 0,
+      cl1Import: 0,
+      cl2Import: 0,
+      solarGen: 0,
+      homeLoad: 0,
+      netLoad: 0,
+    }
+
+    return {
+      slot,
+      time: `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`,
+      avgGridImport: s.count > 0 ? s.gridImport / s.count : 0,
+      avgGridExport: s.count > 0 ? s.gridExport / s.count : 0,
+      avgSolarGen: s.count > 0 ? s.solarGen / s.count : 0,
+      avgHomeLoad: s.count > 0 ? s.homeLoad / s.count : 0,
+      tariffRate: resolveRate(plan, syntheticInterval).ratePerKwh,
+      fitRate: resolveFeedInRate(plan, syntheticInterval).ratePerKwh,
+      projectedSoc: 0,
+    }
+  })
 }

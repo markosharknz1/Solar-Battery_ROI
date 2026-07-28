@@ -3,7 +3,7 @@ import { Area, ComposedChart, Line, CartesianGrid, XAxis, YAxis, Tooltip, Refere
 import type { BatteryQuote, BatterySimResult } from '@/types/battery'
 
 export function PaybackChart({ result, quote }: { result: BatterySimResult; quote: BatteryQuote }) {
-  const netCostAud = quote.totalCostAud - quote.governmentRebatesAud
+  const netCostAud = quote.totalCostAud
 
   const { data, breakEvenYear } = useMemo(() => {
     let conservativeCumulative = 0

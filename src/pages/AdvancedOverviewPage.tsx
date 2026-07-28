@@ -2,12 +2,13 @@ import { Link } from 'react-router-dom'
 import { format } from 'date-fns'
 import { DataGuard } from '@/components/layout/DataGuard'
 import { PageHeader } from '@/components/layout/PageHeader'
-import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { useDataStore } from '@/store/dataStore'
 import { useTariffStore } from '@/store/tariffStore'
 import { useBatteryStore } from '@/store/batteryStore'
 import { calculateCost } from '@/lib/tariffCalculator'
+import { MonthlyBarChart } from '@/components/analytics/MonthlyBarChart'
 
 const SEASONALITY_WARNINGS: Record<string, string> = {
   summer_heavy: 'Your data is mostly from summer months - costs and solar output may look different in winter.',
@@ -69,6 +70,15 @@ export function AdvancedOverviewPage() {
           </CardHeader>
         </Card>
       </div>
+
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle>Monthly usage summary</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <MonthlyBarChart intervals={intervals} tariff={activePlan} simple={false} />
+        </CardContent>
+      </Card>
 
       <div className="grid gap-3 sm:grid-cols-2">
         <Link to="/analytics">

@@ -138,7 +138,7 @@ export function TariffList() {
       </div>
 
       <Dialog open={editingPlan !== null} onOpenChange={(open) => !open && setEditingPlan(null)}>
-        <DialogContent className="max-w-3xl">
+        <DialogContent className="max-h-[90vh] max-w-3xl overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{isNew ? 'Add new plan' : 'Edit plan'}</DialogTitle>
           </DialogHeader>

@@ -1,6 +1,6 @@
 import type { Interval } from '@/types/meter'
 import type { TariffPlan } from '@/types/tariff'
-import type { BatteryQuote, BatterySimResult } from '@/types/battery'
+import type { AverageDaySlot, BatteryQuote, BatterySimResult, ChargeWindow } from '@/types/battery'
 import { calculateCost, resolveRate } from '@/lib/tariffCalculator'
 import { annualizeFactor } from '@/lib/annualize'
 
@@ -197,10 +197,9 @@ export function simulateBattery(intervals: Interval[], quote: BatteryQuote, plan
   const annualEquivCycles = avgDailyCycles * 365
 
   const annualSavingsAud = (baseline.totalCostAud - withBattery.totalCostAud) * factor
-  const netCostAud = quote.totalCostAud - quote.governmentRebatesAud
   const vppCreditAud = quote.vppEnrolled ? quote.vppAnnualCreditAud : 0
   const totalAnnualBenefit = annualSavingsAud + vppCreditAud
-  const simplePaybackYears = totalAnnualBenefit > 0 ? netCostAud / totalAnnualBenefit : Number.POSITIVE_INFINITY
+  const simplePaybackYears = totalAnnualBenefit > 0 ? quote.totalCostAud / totalAnnualBenefit : Number.POSITIVE_INFINITY
 
   const annualKwhCycled = annualEquivCycles * effectiveCapacity
   const yearsTillThroughputExpiry = quote.warrantyThroughputMwh
@@ -313,4 +312,61 @@ export function getSizingAdvice(result: BatterySimResult, totalDays: number): st
     advice.push('Battery size looks well matched to your usage and solar generation.')
   }
   return advice
+}
+
+/**
+ * Instant preview of a charge/discharge strategy applied to a single synthetic "average day"
+ * (from computeAverageDay). This is the Strategy Planner's fast, approximate preview - not a
+ * substitute for simulateBattery(), which runs the full 4-step loop over every real interval.
+ */
+export function previewStrategyOnAverageDay(
+  avgDay: AverageDaySlot[],
+  quote: Pick<
+    BatteryQuote,
+    'capacityKwh' | 'totalDegradationPercent' | 'reservePercent' | 'maxDischargePercent' | 'roundTripEfficiency' | 'maxChargeKw' | 'maxDischargeKw'
+  >,
+  chargeWindows: ChargeWindow[],
+  dischargeStrategy: 'peak_only' | 'any_import' = 'peak_only',
+  useSolar = true,
+): AverageDaySlot[] {
+  const effectiveCapacity = quote.capacityKwh * (1 - (quote.totalDegradationPercent / 100) * 0.5)
+  const floorSoc = (effectiveCapacity * Math.max(quote.reservePercent, 100 - quote.maxDischargePercent)) / 100
+  const maxChargePerSlot = quote.maxChargeKw * 0.5
+  const maxDischargePerSlot = quote.maxDischargeKw * 0.5
+
+  const avgRate = avgDay.length > 0 ? avgDay.reduce((a, s) => a + s.tariffRate, 0) / avgDay.length : 0
+
+  let soc = floorSoc
+
+  return avgDay.map((slot) => {
+    // Charge windows (grid arbitrage)
+    for (const w of chargeWindows) {
+      if (slotInWindow(w.fromTime, w.toTime, slot.slot)) {
+        const headroom = (effectiveCapacity * w.targetPercent) / 100 - soc
+        if (headroom > 0) {
+          const charge = Math.min(headroom / quote.roundTripEfficiency, maxChargePerSlot)
+          soc += charge * quote.roundTripEfficiency
+        }
+      }
+    }
+
+    // Solar surplus charging
+    if (useSolar && slot.avgGridExport > 0) {
+      const headroom = effectiveCapacity - soc
+      const charge = Math.min(slot.avgGridExport, maxChargePerSlot, headroom / quote.roundTripEfficiency)
+      if (charge > 0) soc += charge * quote.roundTripEfficiency
+    }
+
+    // Discharge to meet import
+    if (slot.avgGridImport > 0) {
+      const shouldDischarge = dischargeStrategy === 'any_import' || slot.tariffRate >= avgRate
+      if (shouldDischarge) {
+        const available = Math.max(0, soc - floorSoc)
+        const discharge = Math.min(slot.avgGridImport, available, maxDischargePerSlot)
+        soc -= discharge
+      }
+    }
+
+    return { ...slot, projectedSoc: soc }
+  })
 }

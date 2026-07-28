@@ -1,16 +1,9 @@
 import type { RatePeriod } from '@/types/tariff'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Trash2 } from 'lucide-react'
 
 const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
-const TIME_OPTIONS = Array.from({ length: 48 }, (_, slot) => {
-  const totalMin = slot * 30
-  const h = Math.floor(totalMin / 60)
-  const m = totalMin % 60
-  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
-})
 
 export function RatePeriodRow({
   period,
@@ -60,30 +53,20 @@ export function RatePeriodRow({
           </button>
         </div>
       </div>
-      <Select value={period.startTime} onValueChange={(v) => onChange({ startTime: v })}>
-        <SelectTrigger className="col-span-2">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent className="max-h-64">
-          {TIME_OPTIONS.map((t) => (
-            <SelectItem key={t} value={t}>
-              {t}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-      <Select value={period.endTime} onValueChange={(v) => onChange({ endTime: v })}>
-        <SelectTrigger className="col-span-2">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent className="max-h-64">
-          {TIME_OPTIONS.map((t) => (
-            <SelectItem key={t} value={t}>
-              {t}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+      <Input
+        className="col-span-2"
+        type="time"
+        step={1800}
+        value={period.startTime}
+        onChange={(e) => onChange({ startTime: e.target.value })}
+      />
+      <Input
+        className="col-span-2"
+        type="time"
+        step={1800}
+        value={period.endTime}
+        onChange={(e) => onChange({ endTime: e.target.value })}
+      />
       <Input
         className="col-span-1"
         type="number"

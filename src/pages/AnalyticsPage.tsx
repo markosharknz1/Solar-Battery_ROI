@@ -95,7 +95,7 @@ export function AnalyticsPage() {
           <UsageHeatmap intervals={intervals} evWindow={evWindow ? { startSlot: evWindow.startSlot, endSlot: evWindow.endSlot } : undefined} />
         </TabsContent>
         <TabsContent value="timeseries">
-          <MonthlyBarChart intervals={intervals} simple={false} />
+          <MonthlyBarChart intervals={intervals} simple={false} tariff={activePlan} />
         </TabsContent>
         <TabsContent value="profile">
           <DailyProfileChart intervals={intervals} evWindow={evWindow ? { startHour: evWindow.startHour, endHour: evWindow.endHour } : undefined} />

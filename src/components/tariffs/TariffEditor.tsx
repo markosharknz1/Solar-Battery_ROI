@@ -10,8 +10,9 @@ import { RatePeriodRow } from '@/components/tariffs/RatePeriodRow'
 import { FeedInPeriodRow } from '@/components/tariffs/FeedInPeriodRow'
 import { FixedChargeRow } from '@/components/tariffs/FixedChargeRow'
 import { TariffWeekView } from '@/components/tariffs/TariffWeekView'
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { STATE_LABELS } from '@/lib/stateDefaults'
-import { Plus } from 'lucide-react'
+import { Plus, ChevronDown } from 'lucide-react'
 
 const blankPeriod = (rate = 0.3) => ({
   id: crypto.randomUUID(),
@@ -168,10 +169,17 @@ export function TariffEditor({
       </div>
 
       {(draft.periods.length > 0 || draft.feedInPeriods.length > 0) && (
-        <div>
-          <Label className="mb-2 block">Weekly schedule preview</Label>
-          <TariffWeekView periods={draft.periods} feedInPeriods={draft.feedInPeriods} />
-        </div>
+        <Collapsible>
+          <CollapsibleTrigger asChild>
+            <Button variant="ghost" size="sm" className="w-full justify-between">
+              Weekly schedule preview
+              <ChevronDown className="h-4 w-4" />
+            </Button>
+          </CollapsibleTrigger>
+          <CollapsibleContent className="pt-2">
+            <TariffWeekView periods={draft.periods} feedInPeriods={draft.feedInPeriods} />
+          </CollapsibleContent>
+        </Collapsible>
       )}
 
       <div className="flex justify-end gap-2">

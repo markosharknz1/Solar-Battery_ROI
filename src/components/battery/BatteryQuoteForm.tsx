@@ -5,9 +5,7 @@ import { Input } from '@/components/ui/input'
 import { Slider } from '@/components/ui/slider'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Checkbox } from '@/components/ui/checkbox'
 import { Switch } from '@/components/ui/switch'
-import { REBATE_PRESETS, computeRebateTotal } from '@/lib/rebatePresets'
 import { useTariffStore } from '@/store/tariffStore'
 
 function blankQuote(): BatteryQuote {
@@ -19,13 +17,11 @@ function blankQuote(): BatteryQuote {
     maxDischargeKw: 5,
     roundTripEfficiency: 0.9,
     totalCostAud: 10000,
-    rebatePresetIds: [],
-    governmentRebatesAud: 0,
     warrantyYears: 10,
     warrantyThroughputMwh: null,
     lifetimeYears: 10,
-    totalDegradationPercent: 20,
-    maxDischargePercent: 100,
+    totalDegradationPercent: 30,
+    maxDischargePercent: 80,
     reservePercent: 10,
     targetMinDischargePct: 60,
     targetMaxDischargePct: 90,
@@ -54,12 +50,6 @@ export function BatteryQuoteForm({
 
   const update = (updates: Partial<BatteryQuote>) => setQuote((q) => ({ ...q, ...updates }))
 
-  const toggleRebate = (id: string) => {
-    const current = quote.rebatePresetIds ?? []
-    const next = current.includes(id) ? current.filter((r) => r !== id) : [...current, id]
-    update({ rebatePresetIds: next, governmentRebatesAud: computeRebateTotal(next, quote.capacityKwh) })
-  }
-
   const usesArbitrage = quote.chargePriority === 'solar_then_arbitrage' || quote.chargePriority === 'arbitrage_only'
   const midLifeCapacity = quote.capacityKwh * (1 - (quote.totalDegradationPercent / 100) * 0.5)
   const endOfLifeCapacity = quote.capacityKwh * (1 - quote.totalDegradationPercent / 100)
@@ -71,26 +61,34 @@ export function BatteryQuoteForm({
         <Input value={quote.name} onChange={(e) => update({ name: e.target.value })} />
       </div>
 
-      <div>
-        <Label>Battery capacity: {quote.capacityKwh} kWh</Label>
-        <Slider
-          min={3}
-          max={30}
-          step={0.5}
-          value={[quote.capacityKwh]}
-          onValueChange={([v]) => update({ capacityKwh: v, governmentRebatesAud: computeRebateTotal(quote.rebatePresetIds ?? [], v) })}
-        />
-      </div>
-
       <div className="grid gap-4 sm:grid-cols-2">
+        <div>
+          <Label htmlFor="capacity-kwh">Battery capacity</Label>
+          <div className="flex items-center gap-2">
+            <Input
+              id="capacity-kwh"
+              type="number"
+              min={1}
+              step={0.5}
+              value={quote.capacityKwh}
+              onChange={(e) => update({ capacityKwh: Number.parseFloat(e.target.value) || 0 })}
+              className="w-28"
+            />
+            <span className="text-sm text-muted-foreground">kWh usable capacity</span>
+          </div>
+        </div>
         <div>
           <Label>Max charge/discharge power (kW)</Label>
           <Input type="number" value={quote.maxChargeKw} onChange={(e) => update({ maxChargeKw: Number(e.target.value) || 0, maxDischargeKw: Number(e.target.value) || 0 })} />
         </div>
-        <div>
-          <Label>Installed cost ($)</Label>
-          <Input type="number" value={quote.totalCostAud} onChange={(e) => update({ totalCostAud: Number(e.target.value) || 0 })} />
-        </div>
+      </div>
+
+      <div>
+        <Label htmlFor="installed-cost">Installed cost ($)</Label>
+        <Input id="installed-cost" type="number" value={quote.totalCostAud} onChange={(e) => update({ totalCostAud: Number(e.target.value) || 0 })} />
+        <p className="mt-1 text-xs text-muted-foreground">
+          Enter the final price from your quote - after any rebates or incentives your installer has already applied.
+        </p>
       </div>
 
       <div>
@@ -151,6 +149,10 @@ export function BatteryQuoteForm({
           <div>
             <Label>Maximum discharge: {quote.maxDischargePercent}% (manufacturer health limit)</Label>
             <Slider min={0} max={100} step={1} value={[quote.maxDischargePercent]} onValueChange={([v]) => update({ maxDischargePercent: v })} />
+            <p className="mt-1 text-xs text-muted-foreground">
+              LFP batteries (BYD, newer Powerwalls) can safely go to 100%. NMC batteries benefit from staying above 20%
+              depth.
+            </p>
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
@@ -264,31 +266,6 @@ export function BatteryQuoteForm({
             ))}
           </SelectContent>
         </Select>
-      </div>
-
-      <div className="rounded-md border p-3">
-        <p className="mb-2 text-sm font-medium">Rebates &amp; incentives</p>
-        <p className="mb-2 text-xs text-muted-foreground">
-          Illustrative starting points only - amounts, caps and eligibility change often. Verify current details
-          before relying on these for a purchase decision.
-        </p>
-        <div className="space-y-2">
-          {REBATE_PRESETS.map((preset) => (
-            <label key={preset.id} className="flex items-start gap-2 text-sm">
-              <Checkbox
-                checked={(quote.rebatePresetIds ?? []).includes(preset.id)}
-                onCheckedChange={() => toggleRebate(preset.id)}
-              />
-              <span>
-                <span className="font-medium">{preset.name}</span> ({preset.jurisdiction}) - {preset.description}
-              </span>
-            </label>
-          ))}
-        </div>
-        <div className="mt-2">
-          <Label>Total rebate applied ($)</Label>
-          <Input type="number" value={quote.governmentRebatesAud} onChange={(e) => update({ governmentRebatesAud: Number(e.target.value) || 0 })} />
-        </div>
       </div>
 
       <div className="rounded-md border p-3">
