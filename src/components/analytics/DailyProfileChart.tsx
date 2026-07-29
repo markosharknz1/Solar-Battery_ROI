@@ -1,6 +1,10 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis, Tooltip, Legend, ReferenceArea, ResponsiveContainer } from 'recharts'
 import type { Interval } from '@/types/meter'
+import { seasonOf, SEASON_ORDER, type Season } from '@/lib/seasonalAnalysis'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+
+type SeasonFilter = 'all' | Season
 
 export function DailyProfileChart({
   intervals,
@@ -9,13 +13,25 @@ export function DailyProfileChart({
   intervals: Interval[]
   evWindow?: { startHour: number; endHour: number }
 }) {
+  const [season, setSeason] = useState<SeasonFilter>('all')
+
+  const availableSeasons = useMemo(
+    () => SEASON_ORDER.filter((s) => intervals.some((i) => seasonOf(i.dateStr) === s)),
+    [intervals],
+  )
+
+  const filteredIntervals = useMemo(
+    () => (season === 'all' ? intervals : intervals.filter((i) => seasonOf(i.dateStr) === season)),
+    [intervals, season],
+  )
+
   const data = useMemo(() => {
     const weekdaySum = Array(24).fill(0)
     const weekdayCount = Array(24).fill(0)
     const weekendSum = Array(24).fill(0)
     const weekendCount = Array(24).fill(0)
 
-    for (const i of intervals) {
+    for (const i of filteredIntervals) {
       const isWeekend = i.weekday >= 5
       if (isWeekend) {
         weekendSum[i.hour] += i.gridImport
@@ -31,7 +47,7 @@ export function DailyProfileChart({
       weekday: weekdayCount[hour] > 0 ? weekdaySum[hour] / weekdayCount[hour] : 0,
       weekend: weekendCount[hour] > 0 ? weekendSum[hour] / weekendCount[hour] : 0,
     }))
-  }, [intervals])
+  }, [filteredIntervals])
 
   const evRanges = useMemo(() => {
     if (!evWindow) return []
@@ -63,9 +79,26 @@ export function DailyProfileChart({
     <div className="viz-root rounded-lg border bg-[var(--viz-surface)] p-4">
       <div className="mb-3 flex items-center justify-between">
         <p className="text-sm font-medium text-[var(--viz-text-primary)]">Average usage by hour of day</p>
-        {peakHour && (
-          <span className="text-xs text-[var(--viz-text-muted)]">Peak hour: {peakHour}</span>
-        )}
+        <div className="flex items-center gap-3">
+          {peakHour && (
+            <span className="text-xs text-[var(--viz-text-muted)]">Peak hour: {peakHour}</span>
+          )}
+          {availableSeasons.length > 1 && (
+            <Select value={season} onValueChange={(v) => setSeason(v as SeasonFilter)}>
+              <SelectTrigger className="w-32">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All seasons</SelectItem>
+                {availableSeasons.map((s) => (
+                  <SelectItem key={s} value={s}>
+                    {s}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+        </div>
       </div>
       <ResponsiveContainer width="100%" height={280}>
         <BarChart data={data} margin={{ left: 0, right: 12 }} barGap={2}>

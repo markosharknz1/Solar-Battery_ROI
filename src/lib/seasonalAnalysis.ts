@@ -4,7 +4,7 @@ import { resolveRate, resolveFeedInRate, calculateCost } from '@/lib/tariffCalcu
 
 export type Season = 'Summer' | 'Autumn' | 'Winter' | 'Spring'
 
-const SEASON_ORDER: Season[] = ['Summer', 'Autumn', 'Winter', 'Spring']
+export const SEASON_ORDER: Season[] = ['Summer', 'Autumn', 'Winter', 'Spring']
 
 /** Southern hemisphere (Australia) season boundaries. */
 const SEASON_BY_MONTH: Record<number, Season> = {
@@ -12,6 +12,11 @@ const SEASON_BY_MONTH: Record<number, Season> = {
   3: 'Autumn', 4: 'Autumn', 5: 'Autumn',
   6: 'Winter', 7: 'Winter', 8: 'Winter',
   9: 'Spring', 10: 'Spring', 11: 'Spring',
+}
+
+/** dateStr is 'YYYY-MM-DD'. */
+export function seasonOf(dateStr: string): Season {
+  return SEASON_BY_MONTH[Number(dateStr.slice(5, 7))]
 }
 
 export interface SeasonalBreakdown {
@@ -35,8 +40,7 @@ export function computeSeasonalBreakdown(intervals: Interval[], plan: TariffPlan
   )
 
   for (const interval of intervals) {
-    const month = Number(interval.dateStr.slice(5, 7))
-    const season = SEASON_BY_MONTH[month]
+    const season = seasonOf(interval.dateStr)
     const entry = bySeasons.get(season) ?? { importKwh: 0, exportKwh: 0, usageCostAud: 0, days: new Set<string>() }
 
     const rate = resolveRate(plan, interval)

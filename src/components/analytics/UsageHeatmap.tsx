@@ -2,9 +2,11 @@ import { Fragment, useMemo, useState } from 'react'
 import type { Interval } from '@/types/meter'
 import { sequentialScale, useIsDarkMode } from '@/lib/colorScale'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { seasonOf, SEASON_ORDER, type Season } from '@/lib/seasonalAnalysis'
 
 const WEEKDAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 type Metric = 'usage' | 'export' | 'net'
+type SeasonFilter = 'all' | Season
 
 // Shared column template so the cell grid and the time-label row are guaranteed to
 // align by construction (both are the same CSS grid, not two independently-sized rows).
@@ -40,22 +42,33 @@ export function UsageHeatmap({
   evWindow?: { startSlot: number; endSlot: number }
 }) {
   const [metric, setMetric] = useState<Metric>('usage')
+  const [season, setSeason] = useState<SeasonFilter>('all')
   const [hover, setHover] = useState<{ x: number; y: number; weekday: number; slot: number; value: number } | null>(
     null,
   )
   const isDark = useIsDarkMode()
 
+  const availableSeasons = useMemo(
+    () => SEASON_ORDER.filter((s) => intervals.some((i) => seasonOf(i.dateStr) === s)),
+    [intervals],
+  )
+
+  const filteredIntervals = useMemo(
+    () => (season === 'all' ? intervals : intervals.filter((i) => seasonOf(i.dateStr) === season)),
+    [intervals, season],
+  )
+
   const { grid, p95 } = useMemo(() => {
     const sums = Array.from({ length: 7 }, () => Array(48).fill(0))
     const counts = Array.from({ length: 7 }, () => Array(48).fill(0))
-    for (const i of intervals) {
+    for (const i of filteredIntervals) {
       sums[i.weekday][i.slot] += metricValue(i, metric)
       counts[i.weekday][i.slot] += 1
     }
     const grid = sums.map((row, w) => row.map((sum, s) => (counts[w][s] > 0 ? sum / counts[w][s] : 0)))
     const p95 = percentile(grid.flat(), 0.95)
     return { grid, p95 }
-  }, [intervals, metric])
+  }, [filteredIntervals, metric])
 
   const isInEvWindow = (slot: number) => {
     if (!evWindow) return false
@@ -75,16 +88,33 @@ export function UsageHeatmap({
             </p>
           )}
         </div>
-        <Select value={metric} onValueChange={(v) => setMetric(v as Metric)}>
-          <SelectTrigger className="w-40">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="usage">Usage</SelectItem>
-            <SelectItem value="export">Solar export</SelectItem>
-            <SelectItem value="net">Net load</SelectItem>
-          </SelectContent>
-        </Select>
+        <div className="flex gap-2">
+          {availableSeasons.length > 1 && (
+            <Select value={season} onValueChange={(v) => setSeason(v as SeasonFilter)}>
+              <SelectTrigger className="w-32">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All seasons</SelectItem>
+                {availableSeasons.map((s) => (
+                  <SelectItem key={s} value={s}>
+                    {s}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+          <Select value={metric} onValueChange={(v) => setMetric(v as Metric)}>
+            <SelectTrigger className="w-40">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="usage">Usage</SelectItem>
+              <SelectItem value="export">Solar export</SelectItem>
+              <SelectItem value="net">Net load</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       <div className="overflow-x-auto">
