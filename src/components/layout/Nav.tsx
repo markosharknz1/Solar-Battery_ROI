@@ -11,8 +11,11 @@ const links = [
   { to: '/battery', label: 'Battery' },
   { to: '/compare', label: 'Compare' },
   { to: '/analytics', label: 'Analytics' },
+  { to: '/bills', label: 'Bills' },
   { to: '/import', label: 'Import' },
 ]
+
+const ALWAYS_ENABLED = new Set(['/import', '/bills'])
 
 export function Nav() {
   const hasData = useDataStore((s) => s.summary !== null)
@@ -35,7 +38,7 @@ export function Nav() {
                   cn(
                     'rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
                     isActive ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-accent',
-                    link.to !== '/import' && !hasData && 'pointer-events-none opacity-40',
+                    !ALWAYS_ENABLED.has(link.to) && !hasData && 'pointer-events-none opacity-40',
                   )
                 }
               >

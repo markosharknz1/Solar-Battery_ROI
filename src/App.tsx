@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, lazy, Suspense } from 'react'
 import { Routes, Route, useNavigate } from 'react-router-dom'
 import { Nav } from '@/components/layout/Nav'
 import { SimpleModePage } from '@/pages/SimpleModePage'
@@ -8,8 +8,13 @@ import { TariffsPage } from '@/pages/TariffsPage'
 import { BatteryPage } from '@/pages/BatteryPage'
 import { ComparePage } from '@/pages/ComparePage'
 import { AnalyticsPage } from '@/pages/AnalyticsPage'
+import { BillsPage } from '@/pages/BillsPage'
 import { useImportSharedLink } from '@/hooks/useImportSharedLink'
 import { useUiStore } from '@/store/uiStore'
+
+// Lazy-loaded: pulls in pdfjs-dist (a multi-MB parser + worker), which would otherwise bloat
+// the main bundle for every visitor even though only PDF-bill imports need it.
+const ImportBillPage = lazy(() => import('@/pages/ImportBillPage').then((m) => ({ default: m.ImportBillPage })))
 
 // Redirects "/" to "/overview" only when Advanced mode was already active on arrival (e.g. a
 // fresh load or browser-back into "/") - a mount-only effect, not a reactive <Navigate>, so it
@@ -48,6 +53,15 @@ function App() {
           <Route path="/battery" element={<BatteryPage />} />
           <Route path="/compare" element={<ComparePage />} />
           <Route path="/analytics" element={<AnalyticsPage />} />
+          <Route path="/bills" element={<BillsPage />} />
+          <Route
+            path="/bills/import"
+            element={
+              <Suspense fallback={<p className="text-sm text-muted-foreground">Loading...</p>}>
+                <ImportBillPage />
+              </Suspense>
+            }
+          />
         </Routes>
       </main>
     </div>
