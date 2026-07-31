@@ -5,20 +5,33 @@ import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { STATE_LABELS } from '@/lib/stateDefaults'
+import { resolveStateFromPostcode } from '@/lib/solarYield'
 
 export function HouseholdProfileForm() {
   const profile = useDataStore((s) => s.householdProfile)
   const setProfile = useDataStore((s) => s.setProfile)
 
+  const onPostcodeChange = (postcode: string) => {
+    const detected = resolveStateFromPostcode(postcode)
+    setProfile(detected ? { postcode, state: detected } : { postcode })
+  }
+
   return (
     <Card>
       <CardHeader>
         <CardTitle>Household profile</CardTitle>
-        <CardDescription>
-          Used to pre-fill state-default tariff rates and tailor advice. Saved on this device.
-        </CardDescription>
+        <CardDescription>Used to tailor advice and estimates, e.g. expected solar yield. Saved on this device.</CardDescription>
       </CardHeader>
-      <CardContent className="grid gap-4 sm:grid-cols-3">
+      <CardContent className="grid gap-4 sm:grid-cols-4">
+        <div>
+          <Label>Postcode</Label>
+          <Input
+            value={profile.postcode}
+            onChange={(e) => onPostcodeChange(e.target.value)}
+            placeholder="e.g. 5000"
+            maxLength={4}
+          />
+        </div>
         <div>
           <Label>State</Label>
           <Select value={profile.state} onValueChange={(v) => setProfile({ state: v as AustralianState })}>

@@ -10,6 +10,7 @@ import { DailyProfileChart } from '@/components/analytics/DailyProfileChart'
 import { PeakTimesRanking } from '@/components/analytics/PeakTimesRanking'
 import { SolarAnalysisPanel } from '@/components/analytics/SolarAnalysisPanel'
 import { SeasonalBillsPanel } from '@/components/analytics/SeasonalBillsPanel'
+import { SolarYieldPanel } from '@/components/analytics/SolarYieldPanel'
 
 const SEASONALITY_WARNINGS: Record<string, string> = {
   summer_heavy: 'Your data is mostly from summer months - costs and solar output may look different in winter.',
@@ -90,6 +91,7 @@ export function AnalyticsPage() {
           <TabsTrigger value="peak">Peak times</TabsTrigger>
           {hasSolar && <TabsTrigger value="solar">Solar analysis</TabsTrigger>}
           <TabsTrigger value="seasonal">Seasonal &amp; bills</TabsTrigger>
+          <TabsTrigger value="yield">Solar yield</TabsTrigger>
         </TabsList>
         <TabsContent value="overview">
           <OverviewTab />
@@ -113,6 +115,9 @@ export function AnalyticsPage() {
         )}
         <TabsContent value="seasonal">
           {summary && <SeasonalBillsPanel intervals={intervals} summary={summary} plans={plans} />}
+        </TabsContent>
+        <TabsContent value="yield">
+          {summary && <SolarYieldPanel intervals={intervals} summary={summary} householdProfile={householdProfile} />}
         </TabsContent>
       </Tabs>
     </DataGuard>

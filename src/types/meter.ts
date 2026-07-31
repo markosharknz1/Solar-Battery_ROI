@@ -44,6 +44,7 @@ export interface DataSummary {
 
 export interface HouseholdProfile {
   state: AustralianState
+  postcode: string
   occupants: number
   floorAreaM2: number | null
   overnightLoads: {
@@ -74,6 +75,7 @@ export interface HouseholdProfile {
 export function defaultHouseholdProfile(): HouseholdProfile {
   return {
     state: 'SA',
+    postcode: '',
     occupants: 3,
     floorAreaM2: null,
     overnightLoads: {
