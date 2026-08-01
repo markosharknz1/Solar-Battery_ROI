@@ -12,6 +12,9 @@ dist
 dist-ssr
 *.local
 
+# Electron packaging output (large binaries - built locally via npm run electron:build)
+release/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
