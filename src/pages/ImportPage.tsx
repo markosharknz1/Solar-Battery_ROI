@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { MeterUploader } from '@/components/import/MeterUploader'
 import { SolarUploader } from '@/components/import/SolarUploader'
@@ -8,6 +9,7 @@ import { OvernightLoadPicker } from '@/components/import/OvernightLoadPicker'
 import { useDataStore } from '@/store/dataStore'
 import { parseMeterCsv } from '@/lib/csvParser'
 import { Button } from '@/components/ui/button'
+import { FileText } from 'lucide-react'
 
 export function ImportPage() {
   const summary = useDataStore((s) => s.summary)
@@ -37,6 +39,13 @@ export function ImportPage() {
       </div>
       <div className="mb-6">
         <BillFallbackForm />
+        <div className="mt-3 flex justify-center">
+          <Button variant="link" asChild>
+            <Link to="/bills/import">
+              <FileText className="mr-1 h-4 w-4" /> Prefer to upload a bill PDF instead?
+            </Link>
+          </Button>
+        </div>
       </div>
       <div className="mb-6">
         <HouseholdProfileForm />
