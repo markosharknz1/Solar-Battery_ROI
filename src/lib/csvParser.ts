@@ -244,6 +244,20 @@ function parseNem12Format(csvText: string, warnings: string[]): MeterBucket[] {
   return buckets.toArray()
 }
 
+/**
+ * Merges a new import into existing meter data at *day* granularity: any day present in the
+ * incoming buckets replaces that entire day in the existing data. This keeps overlapping
+ * periods from two different retailers (e.g. after switching providers mid-year) from mixing
+ * readings within a single day, and makes re-importing the same file idempotent.
+ */
+export function mergeMeterBuckets(existing: MeterBucket[], incoming: MeterBucket[]): MeterBucket[] {
+  const incomingDays = new Set(incoming.map((b) => b.dateStr))
+  const kept = existing.filter((b) => !incomingDays.has(b.dateStr))
+  return [...kept, ...incoming].sort((a, b) =>
+    a.dateStr === b.dateStr ? a.slot - b.slot : a.dateStr.localeCompare(b.dateStr),
+  )
+}
+
 export function parseMeterCsv(csvText: string): ParsedMeterData {
   const format = detectMeterFormat(csvText)
   const warnings: string[] = []

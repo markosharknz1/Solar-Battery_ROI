@@ -4,12 +4,44 @@ import { PageHeader } from '@/components/layout/PageHeader'
 import { Button } from '@/components/ui/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { useBillsStore } from '@/store/billsStore'
+import { useDataStore } from '@/store/dataStore'
+import { useTariffStore } from '@/store/tariffStore'
+import { reconcileBill, type BillReconciliation } from '@/lib/billReconciliation'
+import type { Bill } from '@/types/bill'
 import { Plus } from 'lucide-react'
 import { format, parseISO } from 'date-fns'
+
+function TariffCheckCell({ rec }: { rec: BillReconciliation | null }) {
+  if (!rec) return <TableCell className="text-muted-foreground">-</TableCell>
+  if (rec.status === 'insufficient_data') {
+    return (
+      <TableCell className="text-xs text-muted-foreground">
+        No usage data for this period ({rec.coveredDays}/{rec.billDays} days)
+      </TableCell>
+    )
+  }
+  const colour =
+    rec.status === 'good' ? 'text-green-600' : rec.status === 'fair' ? 'text-amber-500' : 'text-destructive'
+  const sign = (rec.variancePct ?? 0) >= 0 ? '+' : ''
+  return (
+    <TableCell>
+      <span className={`font-medium ${colour}`}>
+        {sign}
+        {rec.variancePct?.toFixed(1)}%
+      </span>
+      <p className="text-xs text-muted-foreground">plan says ${rec.computedCostAud?.toFixed(2)}</p>
+    </TableCell>
+  )
+}
 
 export function BillsPage() {
   const bills = useBillsStore((s) => s.bills)
   const deleteBill = useBillsStore((s) => s.deleteBill)
+  const intervals = useDataStore((s) => s.intervals)
+  const activePlan = useTariffStore((s) => s.plans.find((p) => p.isActive))
+
+  const reconcile = (bill: Bill): BillReconciliation | null =>
+    activePlan && intervals.length > 0 ? reconcileBill(bill, intervals, activePlan) : null
 
   const sorted = [...bills].sort((a, b) => a.periodStart.localeCompare(b.periodStart))
   const chartData = sorted.map((b) => ({
@@ -64,6 +96,11 @@ export function BillsPage() {
           )}
 
           <div className="overflow-x-auto">
+            <p className="mb-2 text-xs text-muted-foreground">
+              {activePlan && intervals.length > 0
+                ? `Tariff check compares each bill's actual total against what your active plan (${activePlan.name}) would have charged for your imported usage over the same period. A close match means your tariff setup is right.`
+                : 'Set an active tariff plan and import usage data to check each bill against your modelled tariff.'}
+            </p>
             <Table>
               <TableHeader>
                 <TableRow>
@@ -73,6 +110,7 @@ export function BillsPage() {
                   <TableHead>Export</TableHead>
                   <TableHead>Cost</TableHead>
                   <TableHead>Effective rate</TableHead>
+                  <TableHead>Tariff check</TableHead>
                   <TableHead />
                 </TableRow>
               </TableHeader>
@@ -87,6 +125,7 @@ export function BillsPage() {
                     <TableCell>{b.totalExportKwh != null ? `${b.totalExportKwh.toFixed(0)} kWh` : '-'}</TableCell>
                     <TableCell>${b.totalCostAud.toFixed(2)}</TableCell>
                     <TableCell>{b.totalUsageKwh > 0 ? `${((b.totalCostAud / b.totalUsageKwh) * 100).toFixed(1)}c/kWh` : '-'}</TableCell>
+                    <TariffCheckCell rec={reconcile(b)} />
                     <TableCell>
                       <Button variant="ghost" size="sm" onClick={() => deleteBill(b.id)}>
                         Delete

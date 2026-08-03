@@ -5,6 +5,7 @@ import { SolarUploader } from '@/components/import/SolarUploader'
 import { BillFallbackForm } from '@/components/import/BillFallbackForm'
 import { ImportSummary } from '@/components/import/ImportSummary'
 import { HouseholdProfileForm } from '@/components/import/HouseholdProfileForm'
+import { KeepDataToggle } from '@/components/import/KeepDataToggle'
 import { OvernightLoadPicker } from '@/components/import/OvernightLoadPicker'
 import { useDataStore } from '@/store/dataStore'
 import { parseMeterCsv } from '@/lib/csvParser'
@@ -31,6 +32,9 @@ export function ImportPage() {
       <div className="mb-6 grid gap-6 sm:grid-cols-2">
         <MeterUploader />
         <SolarUploader />
+      </div>
+      <div className="mb-6">
+        <KeepDataToggle />
       </div>
       <div className="mb-6 flex justify-center">
         <Button variant="outline" onClick={() => void loadSample()}>
