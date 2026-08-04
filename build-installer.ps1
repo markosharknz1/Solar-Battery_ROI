@@ -1,5 +1,5 @@
 $ErrorActionPreference = 'Stop'
-$appDir = "C:\Claude\PowerBudget"
+$appDir = $PSScriptRoot
 $tempOut = Join-Path $env:TEMP "sba-electron-build"
 Set-Location $appDir
 
@@ -9,10 +9,9 @@ if ($LASTEXITCODE -ne 0) { throw "Web build failed" }
 
 if (Test-Path $tempOut) { Remove-Item $tempOut -Recurse -Force }
 
-# Packaged outside C:\Claude on purpose - electron-builder's unpack-then-rename step
-# consistently hits an EPERM on this machine when the output lives under C:\Claude
-# (something holds a transient lock on freshly-extracted folders there specifically).
-# Building to a temp location sidesteps it; the finished installer is copied back after.
+# Packaged to a temp directory on purpose - electron-builder's unpack-then-rename step
+# can hit an EPERM when the output lives inside the project tree (something holds a
+# transient lock on freshly-extracted folders). The finished installer is copied back after.
 Write-Host "Packaging installer..."
 & "$appDir\node_modules\.bin\electron-builder.cmd" --win --x64 --config.directories.output=$tempOut
 if ($LASTEXITCODE -ne 0) { throw "electron-builder failed" }

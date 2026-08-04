@@ -1,5 +1,5 @@
 $ErrorActionPreference = 'Stop'
-$appDir = "C:\Claude\PowerBudget"
+$appDir = $PSScriptRoot
 Set-Location $appDir
 
 Write-Host "Building latest version..."

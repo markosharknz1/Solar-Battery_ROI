@@ -28,7 +28,21 @@ device; usage data must be re-imported each session.
 React 18 + Vite + TypeScript, Tailwind CSS + shadcn/ui, Recharts, Zustand,
 PapaParse, date-fns, React Router.
 
-## Installation
+## Installing the desktop app on another PC
+
+The Windows installer is fully self-contained - the target PC needs **nothing**
+installed (no Node.js, no npm, nothing from this repository).
+
+1. On the build machine, run `build-and-install.bat` (or `npm run electron:build`)
+   to produce `release\Solar & Battery Advisor Setup <version>.exe`.
+2. Copy **that single .exe file** to the other PC (USB stick, network share, etc.).
+3. Double-click it there. Windows SmartScreen will warn because the installer is
+   unsigned - click **More info → Run anyway**. Follow the install wizard.
+
+Do **not** copy the `.bat`/`.ps1` scripts to the other PC - those are build tools
+that require Node.js and this repository, and only work on the development machine.
+
+## Development installation
 
 **Requirements:** [Node.js](https://nodejs.org/) 18 or later (includes npm).
 
