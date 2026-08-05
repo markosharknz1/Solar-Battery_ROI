@@ -57,7 +57,7 @@ export function ImportBillPage() {
 
       setMissingFields(missing)
       setDraft({
-        provider: '',
+        provider: extracted.provider ?? '',
         periodStart: extracted.periodStart ?? '',
         periodEnd: extracted.periodEnd ?? '',
         totalCostAud: extracted.totalCostAud != null ? String(extracted.totalCostAud) : '',
