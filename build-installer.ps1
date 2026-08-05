@@ -3,6 +3,23 @@ $appDir = $PSScriptRoot
 $tempOut = Join-Path $env:TEMP "sba-electron-build"
 Set-Location $appDir
 
+# This is a BUILD script for developers - it needs Node.js and takes minutes. If you just
+# want to install the app on a PC, download the Setup .exe from the GitHub Releases page
+# instead; it is fully self-contained and needs none of this.
+if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
+    Write-Host "Node.js is required to BUILD the app but was not found." -ForegroundColor Red
+    Write-Host "To just INSTALL the app, download the Setup .exe from the repo's Releases page instead - it needs nothing else." -ForegroundColor Yellow
+    Write-Host "To build from source, install Node.js from https://nodejs.org first."
+    Read-Host "Press Enter to close"
+    exit 1
+}
+
+if (-not (Test-Path (Join-Path $appDir 'node_modules'))) {
+    Write-Host "Dependencies not installed yet - running npm install (first run only, takes a few minutes)..."
+    npm install
+    if ($LASTEXITCODE -ne 0) { throw "npm install failed" }
+}
+
 Write-Host "Building web app..."
 npm run build
 if ($LASTEXITCODE -ne 0) { throw "Web build failed" }

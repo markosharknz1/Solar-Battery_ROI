@@ -28,19 +28,26 @@ device; usage data must be re-imported each session.
 React 18 + Vite + TypeScript, Tailwind CSS + shadcn/ui, Recharts, Zustand,
 PapaParse, date-fns, React Router.
 
-## Installing the desktop app on another PC
+## Installing the desktop app on any PC
 
 The Windows installer is fully self-contained - the target PC needs **nothing**
 installed (no Node.js, no npm, nothing from this repository).
 
-1. On the build machine, run `build-and-install.bat` (or `npm run electron:build`)
-   to produce `release\Solar & Battery Advisor Setup <version>.exe`.
-2. Copy **that single .exe file** to the other PC (USB stick, network share, etc.).
-3. Double-click it there. Windows SmartScreen will warn because the installer is
-   unsigned - click **More info → Run anyway**. Follow the install wizard.
+**Easiest way:** download `Solar & Battery Advisor Setup <version>.exe` from this
+repository's **[Releases page](../../releases/latest)** and double-click it.
+Windows SmartScreen will warn because the installer is unsigned - click
+**More info → Run anyway** - then follow the wizard (you can pick any install
+folder; the app runs from wherever it's installed).
 
-Do **not** copy the `.bat`/`.ps1` scripts to the other PC - those are build tools
-that require Node.js and this repository, and only work on the development machine.
+Downloading the repository ZIP does **not** get you an installable app - it gets
+you source code, and the `.bat`/`.ps1` files in it are build tools that need
+Node.js. Only use those if you intend to build from source (see below).
+
+### Building the installer from source
+
+Requires [Node.js](https://nodejs.org/). Run `build-and-install.bat` (or
+`npm run electron:build`) - it installs dependencies automatically on first run
+and produces `release\Solar & Battery Advisor Setup <version>.exe`.
 
 ## Development installation
 

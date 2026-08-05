@@ -2,6 +2,22 @@ $ErrorActionPreference = 'Stop'
 $appDir = $PSScriptRoot
 Set-Location $appDir
 
+if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
+    Write-Host "Node.js is required to run from source but was not found - install it from https://nodejs.org," -ForegroundColor Red
+    Write-Host "or just install the app via the Setup .exe from the repo's Releases page instead." -ForegroundColor Yellow
+    Read-Host "Press Enter to close"
+    exit 1
+}
+
+if (-not (Test-Path (Join-Path $appDir 'node_modules'))) {
+    Write-Host "Dependencies not installed yet - running npm install (first run only, takes a few minutes)..."
+    npm install
+    if ($LASTEXITCODE -ne 0) {
+        Read-Host "npm install failed - press Enter to close"
+        exit 1
+    }
+}
+
 Write-Host "Building latest version..."
 & npm run build
 if ($LASTEXITCODE -ne 0) {
