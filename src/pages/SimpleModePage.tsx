@@ -17,16 +17,17 @@ import type { HouseholdProfile } from '@/types/meter'
 
 interface SimpleAnalysis {
   monthlyImportKwh: number
-  monthlyImportCost: number
   monthlyExportKwh: number
-  monthlyExportCredit: number
-  opportunityCost: number
   overnight: ReturnType<typeof detectOvernightLoadPattern>
-  overnightCostPerNight: number
-  overnightCostPerYear: number
-  lowestImportRate: number
-  highestImportRate: number
-  feedInRate: number
+  // Cost figures are null when no rate/plan is set (the user skipped the rate question).
+  monthlyImportCost: number | null
+  monthlyExportCredit: number | null
+  opportunityCost: number | null
+  overnightCostPerNight: number | null
+  overnightCostPerYear: number | null
+  lowestImportRate: number | null
+  highestImportRate: number | null
+  feedInRate: number | null
 }
 
 function buildQuickRatePlan(quickRate: NonNullable<HouseholdProfile['quickRate']>, state: HouseholdProfile['state']): TariffPlan {
@@ -82,8 +83,15 @@ export function SimpleModePage() {
 
   const activePlan = plans.find((p) => p.isActive)
   const hasQuickRate = householdProfile.quickRate.importCentsPerKwh != null
+  const rateSkipped = householdProfile.quickRate.skipped === true
   const usingQuickRate = !activePlan && hasQuickRate
   const plan = activePlan ?? (hasQuickRate ? buildQuickRatePlan(householdProfile.quickRate, householdProfile.state) : null)
+
+  const goToBillImport = () => {
+    // Navigate before flipping the mode - see the CTA button note below.
+    navigate('/bills/import')
+    setMode('advanced')
+  }
 
   const loadSample = async () => {
     const res = await fetch('/sample/sample-meter.csv')
@@ -93,32 +101,47 @@ export function SimpleModePage() {
   }
 
   const analysis = useMemo((): SimpleAnalysis | null => {
-    if (!summary || intervals.length === 0 || !plan) return null
+    if (!summary || intervals.length === 0) return null
 
-    const cost = calculateCost(intervals, plan)
     const months = Math.max(1, summary.totalDays / 30.44)
     const monthlyImportKwh = summary.totalGridImport / months
-    const monthlyImportCost = cost.totalCostAud / months
     const monthlyExportKwh = summary.totalGridExport / months
+    const overnight = detectOvernightLoadPattern(intervals)
+
+    if (!plan) {
+      return {
+        monthlyImportKwh,
+        monthlyExportKwh,
+        overnight,
+        monthlyImportCost: null,
+        monthlyExportCredit: null,
+        opportunityCost: null,
+        overnightCostPerNight: null,
+        overnightCostPerYear: null,
+        lowestImportRate: null,
+        highestImportRate: null,
+        feedInRate: null,
+      }
+    }
+
+    const cost = calculateCost(intervals, plan)
+    const monthlyImportCost = cost.totalCostAud / months
     const feedInRate = plan.feedInPeriods[0]?.ratePerKwh ?? 0
     const monthlyExportCredit = monthlyExportKwh * feedInRate
     const highestImportRate = Math.max(...plan.periods.map((p) => p.ratePerKwh), 0)
     const lowestImportRate = Math.min(...plan.periods.map((p) => p.ratePerKwh))
     const opportunityCost = monthlyExportKwh * highestImportRate
-
-    const overnight = detectOvernightLoadPattern(intervals)
     const overnightCostPerNight = overnight.avgNightlyKwh * lowestImportRate
-    const overnightCostPerYear = overnightCostPerNight * 365
 
     return {
       monthlyImportKwh,
-      monthlyImportCost,
       monthlyExportKwh,
+      overnight,
+      monthlyImportCost,
       monthlyExportCredit,
       opportunityCost,
-      overnight,
       overnightCostPerNight,
-      overnightCostPerYear,
+      overnightCostPerYear: overnightCostPerNight * 365,
       lowestImportRate,
       highestImportRate,
       feedInRate,
@@ -146,11 +169,13 @@ export function SimpleModePage() {
     )
   }
 
-  if (!plan) {
+  if (!plan && !rateSkipped) {
     return (
       <div className="mx-auto max-w-2xl">
         <QuickRateForm
           onSave={(quickRate) => setProfile({ quickRate })}
+          onSkip={() => setProfile({ quickRate: { ...householdProfile.quickRate, skipped: true } })}
+          onImportBill={goToBillImport}
         />
       </div>
     )
@@ -164,15 +189,41 @@ export function SimpleModePage() {
         <span>📄 {summary.totalDays} day(s) of usage data loaded</span>
       </div>
 
+      {!plan && (
+        <Card className="border-amber-500">
+          <CardHeader>
+            <CardTitle className="text-base">Cost estimates are hidden - no rate set</CardTitle>
+            <CardDescription>
+              Usage figures below are complete, but dollar amounts need a rate. Enter a rough average rate, or import
+              a bill PDF and we'll build your tariff from it automatically.
+            </CardDescription>
+            <div className="mt-2 flex flex-wrap gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setProfile({ quickRate: { ...householdProfile.quickRate, skipped: false } })}
+              >
+                Enter a rate
+              </Button>
+              <Button size="sm" variant="outline" onClick={goToBillImport}>
+                Import a bill PDF
+              </Button>
+            </div>
+          </CardHeader>
+        </Card>
+      )}
+
       <div className="grid gap-4 sm:grid-cols-3">
         <Card>
           <CardHeader>
             <CardTitle className="text-base">☁ Grid power purchased</CardTitle>
             <p className="text-2xl font-semibold">{analysis.monthlyImportKwh.toFixed(0)} kWh / month avg</p>
-            <CardDescription>
-              ${analysis.monthlyImportCost.toFixed(0)} / month - ${(analysis.monthlyImportCost * 12).toFixed(0)} / year
-            </CardDescription>
-            {usingQuickRate && (
+            {analysis.monthlyImportCost != null && (
+              <CardDescription>
+                ${analysis.monthlyImportCost.toFixed(0)} / month - ${(analysis.monthlyImportCost * 12).toFixed(0)} / year
+              </CardDescription>
+            )}
+            {usingQuickRate && analysis.lowestImportRate != null && (
               <p className="mt-1 text-xs text-muted-foreground">
                 Using your average rate ({(analysis.lowestImportRate * 100).toFixed(1)}c/kWh) - set up a full tariff
                 plan in Advanced mode for accuracy.
@@ -186,13 +237,17 @@ export function SimpleModePage() {
             <CardHeader>
               <CardTitle className="text-base">☀ Solar sent to grid</CardTitle>
               <p className="text-2xl font-semibold">{analysis.monthlyExportKwh.toFixed(0)} kWh / month avg</p>
-              <CardDescription>
-                ${analysis.monthlyExportCredit.toFixed(0)} / month (at {(analysis.feedInRate * 100).toFixed(1)}c FiT)
-              </CardDescription>
-              <p className="mt-2 text-sm font-medium text-primary">
-                Worth ${analysis.opportunityCost.toFixed(0)}/month if self-consumed instead (at your{' '}
-                {(analysis.highestImportRate * 100).toFixed(1)}c peak rate)
-              </p>
+              {analysis.monthlyExportCredit != null && analysis.feedInRate != null && (
+                <CardDescription>
+                  ${analysis.monthlyExportCredit.toFixed(0)} / month (at {(analysis.feedInRate * 100).toFixed(1)}c FiT)
+                </CardDescription>
+              )}
+              {analysis.opportunityCost != null && analysis.highestImportRate != null && (
+                <p className="mt-2 text-sm font-medium text-primary">
+                  Worth ${analysis.opportunityCost.toFixed(0)}/month if self-consumed instead (at your{' '}
+                  {(analysis.highestImportRate * 100).toFixed(1)}c peak rate)
+                </p>
+              )}
             </CardHeader>
           </Card>
         )}
@@ -202,10 +257,12 @@ export function SimpleModePage() {
             <CardHeader>
               <CardTitle className="text-base">🌙 Cheap overnight usage</CardTitle>
               <p className="text-2xl font-semibold">{analysis.overnight.avgNightlyKwh.toFixed(1)} kWh / night avg</p>
-              <CardDescription>
-                ${analysis.overnightCostPerNight.toFixed(2)} / night (at {(analysis.lowestImportRate * 100).toFixed(0)}c) - $
-                {analysis.overnightCostPerYear.toFixed(0)} / year
-              </CardDescription>
+              {analysis.overnightCostPerNight != null && analysis.lowestImportRate != null && analysis.overnightCostPerYear != null && (
+                <CardDescription>
+                  ${analysis.overnightCostPerNight.toFixed(2)} / night (at {(analysis.lowestImportRate * 100).toFixed(0)}c) - $
+                  {analysis.overnightCostPerYear.toFixed(0)} / year
+                </CardDescription>
+              )}
               {(householdProfile.overnightLoads.evCharger || householdProfile.overnightLoads.airConOvernight) && (
                 <p className="text-sm">
                   {[
@@ -217,7 +274,7 @@ export function SimpleModePage() {
                   detected
                 </p>
               )}
-              {analysis.lowestImportRate <= 0.12 && (
+              {analysis.lowestImportRate != null && analysis.lowestImportRate <= 0.12 && (
                 <p className="mt-1 text-xs text-muted-foreground">
                   You're already on the cheapest rate for this usage. A battery is better used to offset peak-rate
                   consumption.
@@ -255,7 +312,15 @@ export function SimpleModePage() {
   )
 }
 
-function QuickRateForm({ onSave }: { onSave: (quickRate: HouseholdProfile['quickRate']) => void }) {
+function QuickRateForm({
+  onSave,
+  onSkip,
+  onImportBill,
+}: {
+  onSave: (quickRate: HouseholdProfile['quickRate']) => void
+  onSkip: () => void
+  onImportBill: () => void
+}) {
   const [importCents, setImportCents] = useState('')
   const [feedInCents, setFeedInCents] = useState('')
   const [supplyDollars, setSupplyDollars] = useState('')
@@ -267,6 +332,7 @@ function QuickRateForm({ onSave }: { onSave: (quickRate: HouseholdProfile['quick
       importCentsPerKwh: importVal,
       feedInCentsPerKwh: feedInCents ? Number.parseFloat(feedInCents) || 0 : 0,
       dailySupplyDollars: supplyDollars ? Number.parseFloat(supplyDollars) || 0 : 0,
+      skipped: false,
     })
   }
 
@@ -276,7 +342,8 @@ function QuickRateForm({ onSave }: { onSave: (quickRate: HouseholdProfile['quick
         <CardTitle>What's your average electricity rate?</CardTitle>
         <CardDescription>
           We use this for a quick cost estimate. Check your latest bill for a c/kWh usage rate - a rough figure is
-          fine. For an accurate time-of-use breakdown, set up a full tariff plan in Advanced mode instead.
+          fine. Got a bill as a PDF? Import it instead and we'll read the rates for you. You can also skip this and
+          just see your usage.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -292,9 +359,17 @@ function QuickRateForm({ onSave }: { onSave: (quickRate: HouseholdProfile['quick
           <Label>Daily supply charge ($, optional)</Label>
           <Input type="number" step="0.01" value={supplyDollars} onChange={(e) => setSupplyDollars(e.target.value)} placeholder="e.g. 0.95" />
         </div>
-        <Button onClick={submit} disabled={!importCents}>
-          Continue
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button onClick={submit} disabled={!importCents}>
+            Continue
+          </Button>
+          <Button variant="outline" onClick={onImportBill}>
+            Import a bill PDF instead
+          </Button>
+          <Button variant="ghost" onClick={onSkip}>
+            Skip for now
+          </Button>
+        </div>
       </CardContent>
     </Card>
   )

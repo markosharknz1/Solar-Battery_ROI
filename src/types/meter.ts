@@ -69,6 +69,8 @@ export interface HouseholdProfile {
     importCentsPerKwh: number | null
     feedInCentsPerKwh: number | null
     dailySupplyDollars: number | null
+    /** true when the user chose to skip entering a rate - show usage-only figures instead */
+    skipped?: boolean
   }
 }
 

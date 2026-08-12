@@ -33,8 +33,8 @@ export interface ExtractedBillData {
 }
 
 const MONTHS = 'jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec'
-const DATE_TEXT = `\\d{1,2}\\s+(?:${MONTHS})[a-z]*\\s+\\d{4}` // 16 May 2026
-const DATE_HYPHEN = `\\d{1,2}-(?:${MONTHS})[a-z]*-\\d{4}` // 14-Nov-2023 (GloBird)
+const DATE_TEXT = `\\d{1,2}\\s+(?:${MONTHS})[a-z]*\\s+\\d{2,4}` // 16 May 2026, 23 Jan 24 (OVO 2024)
+const DATE_HYPHEN = `\\d{1,2}-(?:${MONTHS})[a-z]*-\\d{2,4}` // 14-Nov-2023 (GloBird)
 const DATE_NUM = `\\d{1,2}[\\/\\-]\\d{1,2}[\\/\\-]\\d{2,4}` // 01/06/2024
 const DATE_ALT = `(?:${DATE_TEXT}|${DATE_HYPHEN}|${DATE_NUM})`
 
@@ -51,7 +51,8 @@ const GENERIC_RANGE_RE = new RegExp(`(${DATE_ALT})\\s*(?:to|until|[-–—])\\s*
 // "Total new charges and credits (including GST) = $12.84", and GloBird's "Total amount
 // payable" is electricity + gas + carried balance combined.
 const TOTAL_PATTERNS: RegExp[] = [
-  /total\s+new\s+charges\s+and\s+credits\s*\(including\s+gst\)\s*=?\s*\$\s*([\d,]+\.\d{2})/i, // AGL, OVO
+  /total\s+new\s+charges\s+and\s+credits\s*\(including\s+gst\)\s*=?\s*\$\s*([\d,]+\.\d{2})/i, // AGL, OVO 2025
+  /total\s+energy\s+charges\s+inclusive\s+of\s+gst\s*\$\s*([\d,]+\.\d{2})/i, // OVO 2024
   /total\s*\(including\s*\$[\d.,]+\s*gst\)\s*\$\s*([\d,]+\.\d{2})/i, // GloBird per-fuel total (electricity first)
   /(?:total\s+amount\s+(?:payable|due)|amount\s+due|total\s+(?:charges|payable|for\s+this\s+bill)|new\s+charges|balance\s+due)\D{0,15}?\$\s*([\d,]+\.\d{2})/i,
 ]
@@ -67,6 +68,28 @@ const EXPORT_CONTEXT_RE = /feed[\s-]?in|solar|export|\bfit\b|generation/i
 const AVERAGE_DAILY_RE = /average\s+daily/i
 
 const TOTAL_GENERATION_RE = /total\s+solar\s+generation:?\D{0,15}?([\d,]+(?:\.\d+)?)\s*kwh/i // GloBird
+// OVO 2024 layout: usage and solar each get a "Total units based on interval data X kWh" line,
+// distinguished by whether the preceding meter-reading block is the solar register.
+const INTERVAL_TOTAL_RE = /total\s+units\s+based\s+on\s+interval\s+data\s+([\d,]+(?:\.\d+)?)\s*kwh/gi
+
+function intervalTotals(text: string): { usage: number | null; solar: number | null } {
+  let usage: number | null = null
+  let solar: number | null = null
+  for (const m of text.matchAll(INTERVAL_TOTAL_RE)) {
+    const value = parseNumber(m[1])
+    if (value === null) continue
+    // Only the section heading ("Solar readings" / register B1) marks the solar register -
+    // a plain "solar" mention isn't enough, the usage total can sit right below the plan
+    // summary's "Average daily solar export" line.
+    const lookback = text.slice(Math.max(0, m.index - 200), m.index)
+    if (/solar\s+readings|register:?\s*b\d/i.test(lookback)) {
+      if (solar === null) solar = value
+    } else if (usage === null) {
+      usage = value
+    }
+  }
+  return { usage, solar }
+}
 const EXPORT_ROW_RE =
   /(?:solar\s+export|solar\s+fit|solar\s+feed[\s-]?in|feed[\s-]?in(?:\s+tariff)?)\*?\D{0,40}?([\d,]+(?:\.\d+)?)\s*kwh/gi
 
@@ -74,7 +97,10 @@ const SUPPLY_PATTERNS: RegExp[] = [
   /(?<!gas\s)(?:daily|supply)\s+charge\D{0,25}?\d+\s+days?\s+\$\s*([\d.]+)/i, // GloBird "Daily Charge 9 Days $0.946", OVO "Supply Charge 1 days $1.562"
   /\d+\s+days?\s+\$\s*([\d.]+)\s+\$[\d.,]+\s+(?:daily\s+)?supply\s+charge/i, // AGL "31 days $0.9821 $30.45 Daily Supply charge"
 ]
-const SUPPLY_CENTS_RE = /(?:supply\s+charge|daily\s+supply|service\s+to\s+property)\D{0,20}?([\d.]+)\s*c(?:ents)?\s*\/\s*day/i
+const SUPPLY_CENTS_PATTERNS: RegExp[] = [
+  /(?:supply\s+charge|daily\s+supply|service\s+to\s+property)\D{0,20}?([\d.]+)\s*[c¢](?:ents)?\s*\/\s*day/i,
+  /supply\s+charge\s+\d+\s+([\d.]+)\s*[c¢]\s*\/\s*day/i, // OVO 2024 "Supply Charge 31 148.50000¢/day"
+]
 const SUPPLY_DOLLARS_RE = /(?:supply\s+charge|daily\s+supply|service\s+to\s+property)\D{0,20}?\$\s*([\d.]+)\s*\/\s*day/i
 
 const PROVIDERS: Array<[RegExp, string]> = [
@@ -95,6 +121,8 @@ function toIsoDateLocal(date: Date): string {
   return `${y}-${m}-${d}`
 }
 
+const MONTH_INDEX: Record<string, number> = { jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5, jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11 }
+
 function parseBillDate(raw: string): string | null {
   const numMatch = raw.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/)
   if (numMatch) {
@@ -104,9 +132,18 @@ function parseBillDate(raw: string): string | null {
     const date = new Date(Number(y), Number(m) - 1, Number(d))
     return Number.isNaN(date.getTime()) ? null : toIsoDateLocal(date)
   }
-  // "14-Nov-2023" parses fine once the hyphens are spaces.
-  const date = new Date(raw.replace(/-/g, ' '))
-  return Number.isNaN(date.getTime()) ? null : toIsoDateLocal(date)
+  // "16 May 2026", "14-Nov-2023", "23 Jan 24" - parsed explicitly so two-digit years
+  // can't be misread by the Date constructor.
+  const textMatch = raw.match(/^(\d{1,2})[\s-]+([a-z]{3})[a-z]*[\s-]+(\d{2,4})$/i)
+  if (textMatch) {
+    const [, d, monRaw, yRaw] = textMatch
+    const month = MONTH_INDEX[monRaw.toLowerCase()]
+    if (month === undefined) return null
+    const y = yRaw.length === 2 ? Number(`20${yRaw}`) : Number(yRaw)
+    const date = new Date(y, month, Number(d))
+    return Number.isNaN(date.getTime()) ? null : toIsoDateLocal(date)
+  }
+  return null
 }
 
 function parseNumber(raw: string | undefined): number | null {
@@ -175,6 +212,17 @@ function extractTouRates(text: string): { touRates: ExtractedTouRate[]; feedInRa
     const isFeedIn = m[2] === '-' || EXPORT_CONTEXT_RE.test(lookback)
     rows.push({ kwh, rate, isFeedIn, index: m.index, end: m.index + m[0].length })
   }
+  // OVO 2024 layout: "EV Charging 702.73 7.99997¢/kWh $56.22" - units without a kWh suffix,
+  // rate in cents. A feed-in row shows as a negative dollar amount ("Solar FiT ... -$50.53").
+  for (const m of text.matchAll(/([\d,]+(?:\.\d+)?)\s+([\d.]+)\s*¢\s*\/\s*kwh\s+(-?)\$/gi)) {
+    const kwh = parseNumber(m[1])
+    const cents = parseNumber(m[2])
+    if (kwh === null || cents === null) continue
+    const lookback = text.slice(Math.max(0, m.index - 60), m.index)
+    const isFeedIn = m[3] === '-' || EXPORT_CONTEXT_RE.test(lookback)
+    rows.push({ kwh, rate: cents / 100, isFeedIn, index: m.index, end: m.index + m[0].length })
+  }
+  rows.sort((a, b) => a.index - b.index)
 
   const feedInRatePerKwh = rows.find((r) => r.isFeedIn)?.rate ?? null
   const usageRows = rows.filter((r) => !r.isFeedIn)
@@ -310,17 +358,19 @@ export function extractBillFields(text: string): ExtractedBillData {
 
   const totalCostAud = firstMatch(normalized, TOTAL_PATTERNS)
 
+  const fromIntervals = intervalTotals(normalized)
   const totalUsageKwh =
     parseNumber(normalized.match(TOTAL_USAGE_RE)?.[1]) ??
     parseNumber(normalized.match(LEGACY_USAGE_RE)?.[1]) ??
+    fromIntervals.usage ??
     sumUsageComponents(normalized)
 
-  const totalExportKwh = findExport(normalized)
+  const totalExportKwh = findExport(normalized) ?? fromIntervals.solar
 
-  const supplyCents = normalized.match(SUPPLY_CENTS_RE)?.[1]
+  const supplyDollars = firstMatch(normalized, SUPPLY_PATTERNS)
+  const supplyCents = firstMatch(normalized, SUPPLY_CENTS_PATTERNS)
   const supplyChargeAud =
-    firstMatch(normalized, SUPPLY_PATTERNS) ??
-    (supplyCents ? parseNumber(supplyCents)! / 100 : parseNumber(normalized.match(SUPPLY_DOLLARS_RE)?.[1]))
+    supplyDollars ?? (supplyCents !== null ? supplyCents / 100 : parseNumber(normalized.match(SUPPLY_DOLLARS_RE)?.[1]))
 
   const { touRates, feedInRatePerKwh } = extractTouRates(normalized)
   // Bills that show an explicit ex-GST subtotal (AGL) itemise their rates ex-GST too.

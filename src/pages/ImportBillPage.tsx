@@ -44,6 +44,8 @@ export function ImportBillPage() {
   const inputRef = useRef<HTMLInputElement>(null)
   const addBill = useBillsStore((s) => s.addBill)
   const addPlan = useTariffStore((s) => s.addPlan)
+  const setActivePlan = useTariffStore((s) => s.setActivePlan)
+  const hasActivePlan = useTariffStore((s) => s.plans.some((p) => p.isActive))
   const householdState = useDataStore((s) => s.householdProfile.state)
   const navigate = useNavigate()
 
@@ -108,7 +110,11 @@ export function ImportBillPage() {
     }
     addBill(bill)
     if (createPlan && extracted && extracted.touRates.length > 0) {
-      addPlan(buildPlanFromBill(extracted, householdState))
+      const plan = buildPlanFromBill(extracted, householdState)
+      addPlan(plan)
+      // With no active plan yet, the bill's plan becomes it - Simple mode and the
+      // reconciliation check start working immediately without any manual rate entry.
+      if (!hasActivePlan) setActivePlan(plan.id)
     }
     navigate('/bills')
   }
@@ -237,7 +243,8 @@ export function ImportBillPage() {
                 </p>
                 <label className="flex items-center gap-2 text-sm">
                   <Checkbox checked={createPlan} onCheckedChange={(v) => setCreatePlan(v === true)} />
-                  Also create a tariff plan from these rates (editable later on the Tariffs page)
+                  Also create a tariff plan from these rates (becomes your active plan if you don't have one;
+                  editable later on the Tariffs page)
                 </label>
               </div>
             )}
