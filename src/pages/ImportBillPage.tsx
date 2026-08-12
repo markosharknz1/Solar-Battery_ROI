@@ -7,8 +7,12 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
-import { extractTextFromPdf, extractBillFields } from '@/lib/billPdfParser'
+import { extractTextFromPdf, extractBillFields, type ExtractedBillData } from '@/lib/billPdfParser'
+import { buildPlanFromBill } from '@/lib/billToPlan'
 import { useBillsStore } from '@/store/billsStore'
+import { useDataStore } from '@/store/dataStore'
+import { useTariffStore } from '@/store/tariffStore'
+import { Checkbox } from '@/components/ui/checkbox'
 import type { Bill } from '@/types/bill'
 import { Upload, ChevronDown } from 'lucide-react'
 
@@ -35,8 +39,12 @@ export function ImportBillPage() {
   const [rawText, setRawText] = useState('')
   const [missingFields, setMissingFields] = useState<string[]>([])
   const [draft, setDraft] = useState<DraftBill>(blankDraft())
+  const [extracted, setExtracted] = useState<ExtractedBillData | null>(null)
+  const [createPlan, setCreatePlan] = useState(true)
   const inputRef = useRef<HTMLInputElement>(null)
   const addBill = useBillsStore((s) => s.addBill)
+  const addPlan = useTariffStore((s) => s.addPlan)
+  const householdState = useDataStore((s) => s.householdProfile.state)
   const navigate = useNavigate()
 
   const update = (updates: Partial<DraftBill>) => setDraft((d) => ({ ...d, ...updates }))
@@ -49,6 +57,7 @@ export function ImportBillPage() {
       const text = await extractTextFromPdf(file)
       const extracted = extractBillFields(text)
       setRawText(text)
+      setExtracted(extracted)
 
       const missing: string[] = []
       if (!extracted.periodStart || !extracted.periodEnd) missing.push('billing period')
@@ -98,6 +107,9 @@ export function ImportBillPage() {
       addedAt: new Date().toISOString(),
     }
     addBill(bill)
+    if (createPlan && extracted && extracted.touRates.length > 0) {
+      addPlan(buildPlanFromBill(extracted, householdState))
+    }
     navigate('/bills')
   }
 
@@ -197,6 +209,39 @@ export function ImportBillPage() {
               <Textarea value={draft.notes} onChange={(e) => update({ notes: e.target.value })} />
             </div>
 
+            {extracted && extracted.touRates.length > 0 && (
+              <div className="space-y-2 rounded-md border p-3">
+                <p className="text-sm font-medium">Detected tariff rates</p>
+                <ul className="space-y-1 text-sm">
+                  {extracted.touRates.map((r, i) => (
+                    <li key={i} className="flex justify-between gap-2">
+                      <span>{r.name}</span>
+                      <span className="text-muted-foreground">
+                        {(r.ratePerKwh * 100).toFixed(2)}c/kWh
+                        {' - '}
+                        {r.windows.length > 0
+                          ? r.windows.map((w) => `${w.startTime}-${w.endTime}`).join(', ')
+                          : 'all day'}
+                      </span>
+                    </li>
+                  ))}
+                  {extracted.feedInRatePerKwh != null && (
+                    <li className="flex justify-between gap-2">
+                      <span>Solar feed-in</span>
+                      <span className="text-muted-foreground">{(extracted.feedInRatePerKwh * 100).toFixed(2)}c/kWh</span>
+                    </li>
+                  )}
+                </ul>
+                <p className="text-xs text-muted-foreground">
+                  Rates on this bill appear to be {extracted.ratesGstInclusive ? 'GST-inclusive' : 'ex-GST (GST added on top)'}.
+                </p>
+                <label className="flex items-center gap-2 text-sm">
+                  <Checkbox checked={createPlan} onCheckedChange={(v) => setCreatePlan(v === true)} />
+                  Also create a tariff plan from these rates (editable later on the Tariffs page)
+                </label>
+              </div>
+            )}
+
             {rawText && (
               <Collapsible>
                 <CollapsibleTrigger asChild>
@@ -220,6 +265,8 @@ export function ImportBillPage() {
                   setStatus('idle')
                   setFileName(null)
                   setRawText('')
+                  setExtracted(null)
+                  setCreatePlan(true)
                   setDraft(blankDraft())
                 }}
               >

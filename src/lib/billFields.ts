@@ -5,6 +5,18 @@
  * must always let the user review and correct every field before saving.
  */
 
+export interface ExtractedTouWindow {
+  startTime: string // 'HH:MM'
+  endTime: string
+}
+
+export interface ExtractedTouRate {
+  name: string
+  ratePerKwh: number // dollars
+  kwh: number
+  windows: ExtractedTouWindow[] // empty = all-day / window unknown
+}
+
 export interface ExtractedBillData {
   provider: string | null
   periodStart: string | null // YYYY-MM-DD
@@ -13,6 +25,10 @@ export interface ExtractedBillData {
   totalUsageKwh: number | null
   totalExportKwh: number | null
   supplyChargeAud: number | null // $/day
+  touRates: ExtractedTouRate[]
+  feedInRatePerKwh: number | null // dollars
+  /** false when the bill itemises rates ex-GST (AGL does; OVO/GloBird are GST-inclusive) */
+  ratesGstInclusive: boolean
   rawText: string
 }
 
@@ -107,6 +123,150 @@ function firstMatch(text: string, patterns: RegExp[]): number | null {
   return null
 }
 
+// ---------------------------------------------------------------------------
+// Time-of-use rate table extraction
+// ---------------------------------------------------------------------------
+
+const TIME_RANGE_RE = /(\d{1,2})(?::(\d{2}))?\s*(am|pm)\s*[-–]\s*(\d{1,2})(?::(\d{2}))?\s*(am|pm)/gi
+
+function to24h(hourRaw: string, minuteRaw: string | undefined, ampm: string): string {
+  let h = Number(hourRaw) % 12
+  if (ampm.toLowerCase() === 'pm') h += 12
+  return `${String(h).padStart(2, '0')}:${minuteRaw ?? '00'}`
+}
+
+function parseWindows(text: string): ExtractedTouWindow[] {
+  const windows: ExtractedTouWindow[] = []
+  for (const m of text.matchAll(TIME_RANGE_RE)) {
+    const startTime = to24h(m[1], m[2], m[3])
+    const endTime = to24h(m[4], m[5], m[6])
+    if (startTime !== endTime) windows.push({ startTime, endTime })
+  }
+  return windows
+}
+
+/** Space-insensitive comparison key - PDF extraction splits ligatures ("Off" -> "O ff"). */
+function nameKey(name: string): string {
+  return name.toLowerCase().replace(/[^a-z]/g, '')
+}
+
+interface RateRow {
+  kwh: number
+  rate: number
+  isFeedIn: boolean
+  index: number
+  end: number
+}
+
+/**
+ * Extracts the time-of-use rate table. Two real-world layouts:
+ * - label BEFORE the numbers ("Usage - Peak 14.564 kWh $0.5852" - OVO, GloBird), with time
+ *   windows either absent (flat rate) or in a separate "When your rates apply" block;
+ * - label AFTER the numbers ("551.618 kWh $0.4409 $243.21 6am-10am and 3pm-12am every day
+ *   Peak" - AGL), with the window text and name trailing each row.
+ */
+function extractTouRates(text: string): { touRates: ExtractedTouRate[]; feedInRatePerKwh: number | null } {
+  const rows: RateRow[] = []
+  for (const m of text.matchAll(/([\d,]+(?:\.\d+)?)\s*kwh\s+(-?)\$\s*([\d.]+)/gi)) {
+    const kwh = parseNumber(m[1])
+    const rate = parseNumber(m[3])
+    if (kwh === null || rate === null) continue
+    const lookback = text.slice(Math.max(0, m.index - 60), m.index)
+    const isFeedIn = m[2] === '-' || EXPORT_CONTEXT_RE.test(lookback)
+    rows.push({ kwh, rate, isFeedIn, index: m.index, end: m.index + m[0].length })
+  }
+
+  const feedInRatePerKwh = rows.find((r) => r.isFeedIn)?.rate ?? null
+  const usageRows = rows.filter((r) => !r.isFeedIn)
+  if (usageRows.length === 0) return { touRates: [], feedInRatePerKwh }
+
+  // Text trailing each row, up to the next row / a "N days" supply line / a length cap,
+  // with the row's own $-amount stripped off the front.
+  const postText = (row: RateRow): string => {
+    const nextIndex = rows.find((r) => r.index > row.end)?.index ?? row.end + 140
+    let seg = text.slice(row.end, Math.min(nextIndex, row.end + 140))
+    seg = seg.replace(/^\s*-?\$\s*[\d.,]+\s*(?:cr)?/i, '')
+    const daysCut = seg.search(/\d[\d,]*\s+days?\b/i)
+    if (daysCut >= 0) seg = seg.slice(0, daysCut)
+    return seg
+  }
+
+  const labelAfterMode = usageRows.some((row) => {
+    const seg = postText(row)
+    return new RegExp(TIME_RANGE_RE.source, 'i').test(seg) || /not applicable/i.test(seg)
+  })
+
+  const touRates: ExtractedTouRate[] = []
+
+  if (labelAfterMode) {
+    for (const row of usageRows) {
+      const seg = postText(row)
+      const windows = parseWindows(seg)
+      const name = seg
+        .replace(TIME_RANGE_RE, ' ')
+        .replace(/\bevery ?day\b|\bnot applicable\b|\band\b/gi, ' ')
+        .replace(/[^a-z0-9&/\- ]/gi, ' ')
+        .replace(/\s+/g, ' ')
+        .trim()
+      touRates.push({ name: name || 'Rate', ratePerKwh: row.rate, kwh: row.kwh, windows })
+    }
+  } else {
+    for (const row of usageRows) {
+      // Name is the trailing text run just before the quantity, with any table-header
+      // words ("Units Price Amount"...) and section headings peeled off the front.
+      const pre = text.slice(Math.max(0, row.index - 90), row.index)
+      let name = (pre.match(/[A-Za-z][A-Za-z0-9&/\- ]*$/)?.[0] ?? '').replace(/\s+/g, ' ').trim()
+      const HEADERS = new Set(['units', 'price', 'amount', 'description', 'quantity', 'rates', 'rate', 'total', 'credits', 'new', 'and', 'charges'])
+      for (;;) {
+        const stripped = name.replace(/^usage and supply charges\s+/i, '')
+        if (stripped !== name) {
+          name = stripped
+          continue
+        }
+        const words = name.split(' ')
+        if (words.length > 1 && HEADERS.has(words[0].toLowerCase())) {
+          name = words.slice(1).join(' ')
+          continue
+        }
+        break
+      }
+      touRates.push({ name: name || 'Rate', ratePerKwh: row.rate, kwh: row.kwh, windows: [] })
+    }
+
+    // OVO-style "When your rates apply:" block - windows listed separately, keyed by name.
+    const blockMatch = text.match(/when your rates apply:?\s*(.{0,600})/i)
+    if (blockMatch) {
+      const block = blockMatch[1]
+      const entries: Array<{ key: string; start: number; textStart: number }> = []
+      for (const m of block.matchAll(/([A-Za-z][A-Za-z /]{1,40}?)\s*\([^)]*\)\s*[-–]\s*/g)) {
+        entries.push({ key: nameKey(m[1]), start: m.index, textStart: m.index + m[0].length })
+      }
+      const windowsByKey = entries.map((e, i) => ({
+        key: e.key,
+        windows: parseWindows(block.slice(e.textStart, entries[i + 1]?.start ?? Math.min(block.length, e.textStart + 120))),
+      }))
+      // Longest key first so "Super Off Peak" wins over "Peak".
+      windowsByKey.sort((a, b) => b.key.length - a.key.length)
+      for (const rate of touRates) {
+        if (rate.windows.length > 0) continue
+        // Pass 1: full name. Pass 2: filler words stripped, so "EV Charging" matches "EV Off peak".
+        const fullKey = nameKey(rate.name)
+        const strippedKey = nameKey(rate.name.replace(/\b(usage|charging|charge|energy)\b/gi, ' '))
+        for (const rateKey of [fullKey, strippedKey]) {
+          if (rateKey.length < 2) continue
+          const hit = windowsByKey.find((w) => rateKey.includes(w.key) || w.key.includes(rateKey))
+          if (hit) {
+            rate.windows = hit.windows
+            break
+          }
+        }
+      }
+    }
+  }
+
+  return { touRates, feedInRatePerKwh }
+}
+
 /** Sums tariff-table consumption rows, skipping export/feed-in rows and per-day averages. */
 function sumUsageComponents(text: string): number | null {
   let sum = 0
@@ -162,5 +322,21 @@ export function extractBillFields(text: string): ExtractedBillData {
     firstMatch(normalized, SUPPLY_PATTERNS) ??
     (supplyCents ? parseNumber(supplyCents)! / 100 : parseNumber(normalized.match(SUPPLY_DOLLARS_RE)?.[1]))
 
-  return { provider, periodStart, periodEnd, totalCostAud, totalUsageKwh, totalExportKwh, supplyChargeAud, rawText: text }
+  const { touRates, feedInRatePerKwh } = extractTouRates(normalized)
+  // Bills that show an explicit ex-GST subtotal (AGL) itemise their rates ex-GST too.
+  const ratesGstInclusive = !/\(excluding\s+gst\)/i.test(normalized)
+
+  return {
+    provider,
+    periodStart,
+    periodEnd,
+    totalCostAud,
+    totalUsageKwh,
+    totalExportKwh,
+    supplyChargeAud,
+    touRates,
+    feedInRatePerKwh,
+    ratesGstInclusive,
+    rawText: text,
+  }
 }
