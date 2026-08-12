@@ -28,26 +28,13 @@ device; usage data must be re-imported each session.
 React 18 + Vite + TypeScript, Tailwind CSS + shadcn/ui, Recharts, Zustand,
 PapaParse, date-fns, React Router.
 
-## Installing the desktop app on any PC
+## Installing the desktop app
 
-The Windows installer is fully self-contained - the target PC needs **nothing**
-installed (no Node.js, no npm, nothing from this repository).
-
-**Easiest way:** download `Solar & Battery Advisor Setup <version>.exe` from this
-repository's **[Releases page](../../releases/latest)** and double-click it.
-Windows SmartScreen will warn because the installer is unsigned - click
-**More info → Run anyway** - then follow the wizard (you can pick any install
-folder; the app runs from wherever it's installed).
-
-Downloading the repository ZIP does **not** get you an installable app - it gets
-you source code, and the `.bat`/`.ps1` files in it are build tools that need
-Node.js. Only use those if you intend to build from source (see below).
-
-### Building the installer from source
-
-Requires [Node.js](https://nodejs.org/). Run `build-and-install.bat` (or
-`npm run electron:build`) - it installs dependencies automatically on first run
-and produces `release\Solar & Battery Advisor Setup <version>.exe`.
+**See [INSTALL.md](INSTALL.md) for exact step-by-step instructions.** The short
+version: download the Setup `.exe` from the **[Releases page](../../releases/latest)**
+and run it - the target PC needs nothing else (no Node.js, no repository).
+The repository ZIP is source code, not an installable app; its `.bat`/`.ps1`
+files are build tools that require Node.js.
 
 ## Development installation
 
