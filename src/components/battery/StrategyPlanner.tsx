@@ -230,6 +230,15 @@ export function StrategyPlanner({
               </div>
             </div>
             {chargeWindows.length === 0 && <p className="text-xs text-muted-foreground">No grid charge windows - battery only charges from solar surplus.</p>}
+            {chargeWindows.length > 0 && (
+              <div className="grid grid-cols-12 gap-2 px-2 text-[10px] text-muted-foreground">
+                <span className="col-span-3">From</span>
+                <span className="col-span-3">To</span>
+                <span className="col-span-2">Charge to %</span>
+                <span className="col-span-3">Rate in window</span>
+                <span className="col-span-1" />
+              </div>
+            )}
             <div className="space-y-2">
               {chargeWindows.map((w) => {
                 const detected = rateAtWindowStart(w.fromTime)
@@ -239,11 +248,14 @@ export function StrategyPlanner({
                     <Input type="time" step={1800} className="col-span-3" value={w.toTime} onChange={(e) => updateWindow(w.id, { toTime: e.target.value })} />
                     <Input
                       type="number"
+                      min={0}
+                      max={100}
+                      title="Charge from the grid during this window until the battery reaches this percentage, then stop"
                       className="col-span-2"
                       value={w.targetPercent}
                       onChange={(e) => updateWindow(w.id, { targetPercent: Number(e.target.value) || 0 })}
                     />
-                    <span className="col-span-3 text-muted-foreground">{detected ? `${(detected.rate * 100).toFixed(0)}c` : ''}</span>
+                    <span className="col-span-3 text-muted-foreground">{detected ? `${(detected.rate * 100).toFixed(0)}c/kWh` : ''}</span>
                     <Button variant="ghost" size="icon" className="col-span-1" onClick={() => removeWindow(w.id)}>
                       <Trash2 className="h-3 w-3" />
                     </Button>
@@ -251,6 +263,12 @@ export function StrategyPlanner({
                 )
               })}
             </div>
+            {chargeWindows.length > 0 && (
+              <p className="mt-2 text-xs text-muted-foreground">
+                "Charge to %" caps grid charging in the window - e.g. 80 means charge overnight to 80% full, leaving
+                headroom to top up free from solar the next day.
+              </p>
+            )}
           </div>
 
           <div className="rounded-md border p-3">
