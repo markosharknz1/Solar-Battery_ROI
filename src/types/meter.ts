@@ -45,6 +45,8 @@ export interface DataSummary {
 export interface HouseholdProfile {
   state: AustralianState
   postcode: string
+  /** true = dual fuel (gas + electricity); false/undefined = electricity only */
+  hasGasSupply?: boolean
   occupants: number
   floorAreaM2: number | null
   overnightLoads: {
@@ -78,6 +80,7 @@ export function defaultHouseholdProfile(): HouseholdProfile {
   return {
     state: 'SA',
     postcode: '',
+    hasGasSupply: false,
     occupants: 3,
     floorAreaM2: null,
     overnightLoads: {
