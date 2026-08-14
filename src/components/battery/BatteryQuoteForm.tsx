@@ -66,6 +66,10 @@ export function BatteryQuoteForm({
       <div>
         <Label>Round-trip efficiency: {(quote.roundTripEfficiency * 100).toFixed(0)}%</Label>
         <Slider min={80} max={98} step={1} value={[quote.roundTripEfficiency * 100]} onValueChange={([v]) => update({ roundTripEfficiency: v / 100 })} />
+        <p className="mt-1 text-xs text-muted-foreground">
+          Typical: ~90% for AC-coupled systems (e.g. Powerwall), ~95% for DC-coupled / hybrid-inverter systems. Check
+          the battery's datasheet.
+        </p>
       </div>
 
       <div className="rounded-md border p-3">
