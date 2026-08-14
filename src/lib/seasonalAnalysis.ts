@@ -19,6 +19,17 @@ export function seasonOf(dateStr: string): Season {
   return SEASON_BY_MONTH[Number(dateStr.slice(5, 7))]
 }
 
+/** The season it is right now, by the device's local date (southern hemisphere). */
+export function currentSeason(now: Date = new Date()): Season {
+  return SEASON_BY_MONTH[now.getMonth() + 1]
+}
+
+/** All four seasons in calendar succession starting from the current one. */
+export function seasonsFromCurrent(now: Date = new Date()): Season[] {
+  const start = SEASON_ORDER.indexOf(currentSeason(now))
+  return [...SEASON_ORDER.slice(start), ...SEASON_ORDER.slice(0, start)]
+}
+
 export interface SeasonalBreakdown {
   season: Season
   days: number

@@ -43,6 +43,3 @@ export function resolveStateFromPostcode(postcode: string): AustralianState | nu
   return postcodeToState(Number(postcode))
 }
 
-export function estimateAnnualGenerationKwh(systemKw: number, state: AustralianState): number {
-  return systemKw * AVERAGE_ANNUAL_YIELD_KWH_PER_KW[state]
-}

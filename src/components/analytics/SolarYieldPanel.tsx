@@ -1,10 +1,13 @@
 import { useMemo, useState } from 'react'
 import type { Interval, DataSummary, HouseholdProfile } from '@/types/meter'
-import { AVERAGE_ANNUAL_YIELD_KWH_PER_KW, estimateAnnualGenerationKwh, resolveStateFromPostcode } from '@/lib/solarYield'
+import { AVERAGE_ANNUAL_YIELD_KWH_PER_KW, resolveStateFromPostcode } from '@/lib/solarYield'
+import { solarZoneForPostcode } from '@/lib/solarZones'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import { AlertTriangle, CheckCircle2, XCircle } from 'lucide-react'
+
+const PRESET_SIZES_KW = [5, 10, 15]
 
 export function SolarYieldPanel({
   intervals,
@@ -21,10 +24,12 @@ export function SolarYieldPanel({
 
   const postcodeState = resolveStateFromPostcode(householdProfile.postcode)
   const state = postcodeState ?? householdProfile.state
-  const yieldPerKw = AVERAGE_ANNUAL_YIELD_KWH_PER_KW[state]
+  // Postcode-precise CER solar zone when available; state-wide average as the fallback.
+  const zone = solarZoneForPostcode(householdProfile.postcode)
+  const yieldPerKw = zone?.annualKwhPerKw ?? AVERAGE_ANNUAL_YIELD_KWH_PER_KW[state]
 
   const systemKwNum = Number.parseFloat(systemKw) || 0
-  const expectedAnnualKwh = systemKwNum > 0 ? estimateAnnualGenerationKwh(systemKwNum, state) : 0
+  const expectedAnnualKwh = systemKwNum > 0 ? systemKwNum * yieldPerKw : 0
   const expectedDailyKwh = expectedAnnualKwh / 365
 
   const hasInverterData = intervals.some((i) => i.solarGen > 0)
@@ -53,22 +58,35 @@ export function SolarYieldPanel({
         <CardHeader>
           <CardTitle className="text-base">Expected solar yield</CardTitle>
           <CardDescription>
-            Rough state-average estimate for a well-oriented, unshaded system at a typical tilt - based on your
-            postcode's state ({state}). Real output varies with orientation, shading and weather, so treat this as a
-            sanity check, not a precise forecast.
+            {zone
+              ? `Based on the Clean Energy Regulator's official solar zone for postcode ${householdProfile.postcode.trim()} - the same zone table used for STC rebate calculations.`
+              : `Rough state-average estimate based on your household profile's state (${state}) - enter your postcode in the household profile for a zone-precise figure.`}{' '}
+            Assumes a well-oriented, unshaded system at a typical tilt. Real output varies with orientation, shading
+            and weather, so treat this as a sanity check, not a precise forecast.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {!postcodeState && householdProfile.postcode && (
+          {!zone && householdProfile.postcode.trim() !== '' && (
             <p className="text-xs text-destructive">
               Couldn't recognise postcode "{householdProfile.postcode}" - falling back to the state set in your
               household profile ({householdProfile.state}).
             </p>
           )}
           <p className="text-sm">
-            Estimated yield for {state}: <span className="font-medium">{yieldPerKw} kWh/kW/year</span> (~
+            {zone ? `CER solar zone ${zone.zone} (postcode ${householdProfile.postcode.trim()})` : `Estimated yield for ${state}`}:{' '}
+            <span className="font-medium">{yieldPerKw} kWh/kW/year</span> (~
             {(yieldPerKw / 365).toFixed(1)} kWh/kW/day average)
           </p>
+
+          <div className="grid gap-3 sm:grid-cols-3">
+            {PRESET_SIZES_KW.map((kw) => (
+              <div key={kw} className="rounded-md border p-3">
+                <p className="text-xs text-muted-foreground">{kw} kW system</p>
+                <p className="text-lg font-semibold">{(kw * yieldPerKw).toLocaleString()} kWh/yr</p>
+                <p className="text-xs text-muted-foreground">~{((kw * yieldPerKw) / 365).toFixed(1)} kWh/day average</p>
+              </div>
+            ))}
+          </div>
 
           <div className="grid gap-4 sm:grid-cols-3">
             <div>
