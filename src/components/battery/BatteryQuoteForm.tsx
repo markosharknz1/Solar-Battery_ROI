@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import type { BatteryQuote } from '@/types/battery'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
@@ -7,52 +6,21 @@ import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
 import { useTariffStore } from '@/store/tariffStore'
-
-function blankQuote(): BatteryQuote {
-  return {
-    id: crypto.randomUUID(),
-    name: 'Battery quote',
-    capacityKwh: 10,
-    maxChargeKw: 5,
-    maxDischargeKw: 5,
-    roundTripEfficiency: 0.9,
-    totalCostAud: 10000,
-    warrantyYears: 10,
-    warrantyThroughputMwh: null,
-    lifetimeYears: 10,
-    totalDegradationPercent: 30,
-    maxDischargePercent: 80,
-    reservePercent: 10,
-    targetMinDischargePct: 60,
-    targetMaxDischargePct: 90,
-    backupCapable: false,
-    chargePriority: 'solar_then_offpeak',
-    dischargePriority: 'peak_only',
-    arbitrageTargetPercent: 80,
-    arbitrageStartTime: '23:00',
-    arbitrageEndTime: '07:00',
-    solarSystemKw: null,
-    inverterKw: null,
-    exportLimitKw: null,
-    vppEnrolled: false,
-    vppAnnualCreditAud: 0,
-  }
-}
+import { useBatteryStore } from '@/store/batteryStore'
 
 export function BatteryQuoteForm({
   onRun,
-  initialQuote,
-  initialTariffId,
 }: {
   onRun: (quote: BatteryQuote, tariffId: string) => void
-  initialQuote?: BatteryQuote
-  initialTariffId?: string
 }) {
-  const [quote, setQuote] = useState<BatteryQuote>(initialQuote ?? blankQuote())
+  // The draft lives in the persisted store and is shared with the Strategy Planner tab -
+  // edits here show there and vice versa, and nothing is lost switching tabs or restarting.
+  const quote = useBatteryStore((s) => s.draftQuote)
+  const update = useBatteryStore((s) => s.updateDraftQuote)
+  const draftTariffId = useBatteryStore((s) => s.draftTariffId)
+  const setTariffId = useBatteryStore((s) => s.setDraftTariffId)
   const plans = useTariffStore((s) => s.plans)
-  const [tariffId, setTariffId] = useState<string>(initialTariffId ?? plans[0]?.id ?? '')
-
-  const update = (updates: Partial<BatteryQuote>) => setQuote((q) => ({ ...q, ...updates }))
+  const tariffId = draftTariffId && plans.some((p) => p.id === draftTariffId) ? draftTariffId : (plans[0]?.id ?? '')
 
   const usesArbitrage = quote.chargePriority === 'solar_then_arbitrage' || quote.chargePriority === 'arbitrage_only'
   const midLifeCapacity = quote.capacityKwh * (1 - (quote.totalDegradationPercent / 100) * 0.5)

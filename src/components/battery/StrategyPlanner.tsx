@@ -4,6 +4,7 @@ import type { TariffPlan } from '@/types/tariff'
 import type { BatteryQuote, ChargeWindow } from '@/types/battery'
 import { computeAverageDay } from '@/lib/dataProcessor'
 import { previewStrategyOnAverageDay, simulateBattery } from '@/lib/batterySimulator'
+import { useBatteryStore } from '@/store/batteryStore'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -27,57 +28,21 @@ import {
 type DischargeStrategy = 'peak_only' | 'any_import'
 type DayFilter = 'all' | 'weekday' | 'weekend'
 
-interface PlannerParams {
-  capacityKwh: number
-  maxChargeKw: number
-  maxDischargeKw: number
-  roundTripEfficiency: number
-  totalDegradationPercent: number
-  reservePercent: number
-  maxDischargePercent: number
-}
-
-function defaultPlannerParams(): PlannerParams {
-  return {
-    capacityKwh: 10,
-    maxChargeKw: 5,
-    maxDischargeKw: 5,
-    roundTripEfficiency: 0.9,
-    totalDegradationPercent: 30,
-    reservePercent: 10,
-    maxDischargePercent: 80,
-  }
-}
-
-function blankQuoteFromPlanner(params: PlannerParams, chargeWindows: ChargeWindow[], dischargeStrategy: DischargeStrategy, useSolar: boolean): BatteryQuote {
+/** The full simulation quote is the shared draft plus the planner's strategy choices. */
+function quoteFromDraft(
+  draft: BatteryQuote,
+  chargeWindows: ChargeWindow[],
+  dischargeStrategy: DischargeStrategy,
+  useSolar: boolean,
+): BatteryQuote {
   const window = chargeWindows[0]
   return {
-    id: crypto.randomUUID(),
-    name: 'Strategy planner quote',
-    capacityKwh: params.capacityKwh,
-    maxChargeKw: params.maxChargeKw,
-    maxDischargeKw: params.maxDischargeKw,
-    roundTripEfficiency: params.roundTripEfficiency,
-    totalCostAud: 0,
-    warrantyYears: 10,
-    warrantyThroughputMwh: null,
-    lifetimeYears: 10,
-    totalDegradationPercent: params.totalDegradationPercent,
-    maxDischargePercent: params.maxDischargePercent,
-    reservePercent: params.reservePercent,
-    targetMinDischargePct: 60,
-    targetMaxDischargePct: 90,
-    backupCapable: false,
+    ...draft,
     chargePriority: window ? (useSolar ? 'solar_then_arbitrage' : 'arbitrage_only') : useSolar ? 'solar_only' : 'arbitrage_only',
     dischargePriority: dischargeStrategy,
-    arbitrageTargetPercent: window?.targetPercent ?? 80,
-    arbitrageStartTime: window?.fromTime ?? '23:00',
-    arbitrageEndTime: window?.toTime ?? '07:00',
-    solarSystemKw: null,
-    inverterKw: null,
-    exportLimitKw: null,
-    vppEnrolled: false,
-    vppAnnualCreditAud: 0,
+    arbitrageTargetPercent: window?.targetPercent ?? draft.arbitrageTargetPercent,
+    arbitrageStartTime: window?.fromTime ?? draft.arbitrageStartTime,
+    arbitrageEndTime: window?.toTime ?? draft.arbitrageEndTime,
   }
 }
 
@@ -117,14 +82,16 @@ export function StrategyPlanner({
   plans: TariffPlan[]
   onApplyAndRun: (quote: BatteryQuote, tariffId: string) => void
 }) {
-  const [tariffId, setTariffId] = useState(plans[0]?.id ?? '')
+  // All planner state lives in the persisted battery store, shared with the Configure &
+  // simulate tab - capacity typed here is the capacity there, and tab switches lose nothing.
+  const params = useBatteryStore((s) => s.draftQuote)
+  const updateDraft = useBatteryStore((s) => s.updateDraftQuote)
+  const { chargeWindows, dischargeStrategy, useSolar, presetId: selectedPreset } = useBatteryStore((s) => s.planner)
+  const updatePlanner = useBatteryStore((s) => s.updatePlanner)
+  const draftTariffId = useBatteryStore((s) => s.draftTariffId)
+  const setTariffId = useBatteryStore((s) => s.setDraftTariffId)
+  const tariffId = draftTariffId && plans.some((p) => p.id === draftTariffId) ? draftTariffId : (plans[0]?.id ?? '')
   const plan = plans.find((p) => p.id === tariffId)
-
-  const [params, setParams] = useState<PlannerParams>(defaultPlannerParams())
-  const [chargeWindows, setChargeWindows] = useState<ChargeWindow[]>([])
-  const [dischargeStrategy, setDischargeStrategy] = useState<DischargeStrategy>('peak_only')
-  const [useSolar, setUseSolar] = useState(true)
-  const [selectedPreset, setSelectedPreset] = useState<string | null>(null)
 
   const [dayFilter, setDayFilter] = useState<DayFilter>('all')
   const [showRateOverlay, setShowRateOverlay] = useState(true)
@@ -132,13 +99,17 @@ export function StrategyPlanner({
 
   const hasSolar = intervals.some((i) => i.solarGen > 0 || i.gridExport > 0)
 
+  const setChargeWindows = (windows: ChargeWindow[]) => updatePlanner({ chargeWindows: windows })
+
   const applyPreset = (presetId: string) => {
     const preset = PRESETS.find((p) => p.id === presetId)
     if (!preset) return
-    setSelectedPreset(presetId)
-    setChargeWindows(preset.chargeWindows.map((w) => ({ ...w, id: crypto.randomUUID() })))
-    setDischargeStrategy(preset.dischargeStrategy)
-    setUseSolar(preset.useSolar)
+    updatePlanner({
+      presetId,
+      chargeWindows: preset.chargeWindows.map((w) => ({ ...w, id: crypto.randomUUID() })),
+      dischargeStrategy: preset.dischargeStrategy,
+      useSolar: preset.useSolar,
+    })
   }
 
   const avgDay = useMemo(() => (plan ? computeAverageDay(intervals, plan, dayFilter) : []), [intervals, plan, dayFilter])
@@ -162,14 +133,15 @@ export function StrategyPlanner({
 
   const quickResult = useMemo(() => {
     if (!plan) return null
-    const quote = blankQuoteFromPlanner(params, chargeWindows, dischargeStrategy, useSolar)
+    const quote = quoteFromDraft(params, chargeWindows, dischargeStrategy, useSolar)
     return simulateBattery(intervals, quote, plan)
   }, [intervals, plan, params, chargeWindows, dischargeStrategy, useSolar])
 
-  const addWindow = () => setChargeWindows((w) => [...w, { id: crypto.randomUUID(), fromTime: '23:00', toTime: '07:00', targetPercent: 80 }])
+  const addWindow = () =>
+    setChargeWindows([...chargeWindows, { id: crypto.randomUUID(), fromTime: '23:00', toTime: '07:00', targetPercent: 80 }])
   const updateWindow = (id: string, updates: Partial<ChargeWindow>) =>
-    setChargeWindows((w) => w.map((win) => (win.id === id ? { ...win, ...updates } : win)))
-  const removeWindow = (id: string) => setChargeWindows((w) => w.filter((win) => win.id !== id))
+    setChargeWindows(chargeWindows.map((win) => (win.id === id ? { ...win, ...updates } : win)))
+  const removeWindow = (id: string) => setChargeWindows(chargeWindows.filter((win) => win.id !== id))
 
   const autoSuggestWindow = () => {
     if (!plan || plan.periods.length === 0) return
@@ -236,11 +208,11 @@ export function StrategyPlanner({
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <Label className="text-xs">Capacity (kWh)</Label>
-                <Input type="number" value={params.capacityKwh} onChange={(e) => setParams({ ...params, capacityKwh: Number(e.target.value) || 0 })} />
+                <Input type="number" value={params.capacityKwh} onChange={(e) => updateDraft({ capacityKwh: Number(e.target.value) || 0 })} />
               </div>
               <div>
                 <Label className="text-xs">Reserve (%)</Label>
-                <Input type="number" value={params.reservePercent} onChange={(e) => setParams({ ...params, reservePercent: Number(e.target.value) || 0 })} />
+                <Input type="number" value={params.reservePercent} onChange={(e) => updateDraft({ reservePercent: Number(e.target.value) || 0 })} />
               </div>
             </div>
           </div>
@@ -285,16 +257,16 @@ export function StrategyPlanner({
             <p className="mb-2 text-sm font-medium">Discharge strategy</p>
             <div className="space-y-1 text-sm">
               <label className="flex items-center gap-2">
-                <input type="radio" checked={dischargeStrategy === 'peak_only'} onChange={() => setDischargeStrategy('peak_only')} />
+                <input type="radio" checked={dischargeStrategy === 'peak_only'} onChange={() => updatePlanner({ dischargeStrategy: 'peak_only' })} />
                 During peak rate only
               </label>
               <label className="flex items-center gap-2">
-                <input type="radio" checked={dischargeStrategy === 'any_import'} onChange={() => setDischargeStrategy('any_import')} />
+                <input type="radio" checked={dischargeStrategy === 'any_import'} onChange={() => updatePlanner({ dischargeStrategy: 'any_import' })} />
                 Any grid import
               </label>
             </div>
             <label className="mt-2 flex items-center gap-2 text-sm">
-              <Checkbox checked={useSolar} onCheckedChange={(v) => setUseSolar(v === true)} />
+              <Checkbox checked={useSolar} onCheckedChange={(v) => updatePlanner({ useSolar: v === true })} />
               Charge from solar surplus
             </label>
           </div>
@@ -303,7 +275,22 @@ export function StrategyPlanner({
             Reserve: {((params.capacityKwh * params.reservePercent) / 100).toFixed(1)} kWh - battery will not discharge below this.
           </p>
 
-          <Button className="w-full" onClick={() => onApplyAndRun(blankQuoteFromPlanner(params, chargeWindows, dischargeStrategy, useSolar), tariffId)}>
+          <Button
+            className="w-full"
+            onClick={() => {
+              const quote = quoteFromDraft(params, chargeWindows, dischargeStrategy, useSolar)
+              // Persist the strategy choice into the shared draft so the Configure tab's
+              // Strategy section reflects what was applied here.
+              updateDraft({
+                chargePriority: quote.chargePriority,
+                dischargePriority: quote.dischargePriority,
+                arbitrageTargetPercent: quote.arbitrageTargetPercent,
+                arbitrageStartTime: quote.arbitrageStartTime,
+                arbitrageEndTime: quote.arbitrageEndTime,
+              })
+              onApplyAndRun(quote, tariffId)
+            }}
+          >
             Apply and run full simulation
           </Button>
         </div>
