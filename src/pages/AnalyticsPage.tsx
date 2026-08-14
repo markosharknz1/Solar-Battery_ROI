@@ -11,6 +11,7 @@ import { PeakTimesRanking } from '@/components/analytics/PeakTimesRanking'
 import { SolarAnalysisPanel } from '@/components/analytics/SolarAnalysisPanel'
 import { SeasonalBillsPanel } from '@/components/analytics/SeasonalBillsPanel'
 import { SolarYieldPanel } from '@/components/analytics/SolarYieldPanel'
+import { HouseholdSummaryCard } from '@/components/layout/HouseholdSummaryCard'
 
 const SEASONALITY_WARNINGS: Record<string, string> = {
   summer_heavy: 'Your data is mostly from summer months - costs and solar output may look different in winter.',
@@ -30,6 +31,7 @@ function OverviewTab() {
       {seasonalityWarning && (
         <p className="rounded-md bg-accent px-3 py-2 text-sm text-muted-foreground">{seasonalityWarning}</p>
       )}
+      <HouseholdSummaryCard />
       <div className="grid gap-4 sm:grid-cols-4">
         <Card>
           <CardHeader>
