@@ -115,3 +115,11 @@
   --viz-diverging-pos: #3987e5;
   --viz-diverging-mid: #383835;
 }
+
+/* Battery savings report printing: the report overlay is portalled to <body>, so hiding
+   the app root while it is open prints just the report. */
+@media print {
+  body.report-open #root {
+    display: none;
+  }
+}

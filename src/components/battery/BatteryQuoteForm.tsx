@@ -17,6 +17,7 @@ export function BatteryQuoteForm({
   // edits here show there and vice versa, and nothing is lost switching tabs or restarting.
   const quote = useBatteryStore((s) => s.draftQuote)
   const update = useBatteryStore((s) => s.updateDraftQuote)
+  const addQuote = useBatteryStore((s) => s.addQuote)
   const draftTariffId = useBatteryStore((s) => s.draftTariffId)
   const setTariffId = useBatteryStore((s) => s.setDraftTariffId)
   const plans = useTariffStore((s) => s.plans)
@@ -250,12 +251,40 @@ export function BatteryQuoteForm({
           <Switch checked={quote.vppEnrolled} onCheckedChange={(v) => update({ vppEnrolled: v })} />
         </div>
         {quote.vppEnrolled && (
-          <div className="mt-2">
-            <Label>Annual VPP credit ($)</Label>
-            <Input type="number" value={quote.vppAnnualCreditAud} onChange={(e) => update({ vppAnnualCreditAud: Number(e.target.value) || 0 })} />
-            <p className="mt-1 text-xs text-muted-foreground">
-              VPPs let your retailer draw on your battery during grid events in exchange for credits - check the
-              program's terms for how it may affect your battery's availability and warranty.
+          <div className="mt-2 space-y-2">
+            <div>
+              <Label>Fixed annual credit ($/yr)</Label>
+              <Input type="number" value={quote.vppAnnualCreditAud} onChange={(e) => update({ vppAnnualCreditAud: Number(e.target.value) || 0 })} />
+              <p className="mt-1 text-xs text-muted-foreground">Sign-up or membership credits the program pays regardless of events.</p>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <Label>Event credit rate (c/kWh)</Label>
+                <Input
+                  type="number"
+                  value={((quote.vppEventRatePerKwh ?? 0) * 100).toString()}
+                  onChange={(e) => update({ vppEventRatePerKwh: (Number(e.target.value) || 0) / 100 })}
+                />
+              </div>
+              <div>
+                <Label>Est. event energy (kWh/yr)</Label>
+                <Input
+                  type="number"
+                  value={quote.vppEventKwhPerYear ?? 0}
+                  onChange={(e) => update({ vppEventKwhPerYear: Number(e.target.value) || 0 })}
+                />
+              </div>
+            </div>
+            {(quote.vppEventRatePerKwh ?? 0) * (quote.vppEventKwhPerYear ?? 0) > 0 && (
+              <p className="text-xs font-medium">
+                Total VPP credit: $
+                {(quote.vppAnnualCreditAud + (quote.vppEventRatePerKwh ?? 0) * (quote.vppEventKwhPerYear ?? 0)).toFixed(0)}/yr
+              </p>
+            )}
+            <p className="text-xs text-muted-foreground">
+              Enter the rate your program pays per kWh drawn from your battery during grid events, and roughly how much
+              event energy it expects per year (both are in the program's terms). VPPs may affect battery availability
+              and warranty - check before enrolling.
             </p>
           </div>
         )}
@@ -264,6 +293,21 @@ export function BatteryQuoteForm({
       <Button disabled={!tariffId} onClick={() => onRun(quote, tariffId)} className="w-full">
         Run simulation
       </Button>
+      <Button
+        variant="outline"
+        className="w-full"
+        onClick={() => {
+          const id = crypto.randomUUID()
+          update({ id })
+          addQuote({ ...quote, id })
+        }}
+      >
+        Save as new quote
+      </Button>
+      <p className="text-xs text-muted-foreground">
+        Running a simulation saves/updates this quote in the Saved quotes list below. "Save as new quote" starts a
+        separate copy, leaving the previous quote untouched - use it to compare several batteries side by side.
+      </p>
     </div>
   )
 }

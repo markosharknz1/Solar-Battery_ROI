@@ -42,7 +42,11 @@ export interface BatteryQuote {
 
   // VPP
   vppEnrolled: boolean
-  vppAnnualCreditAud: number
+  vppAnnualCreditAud: number // fixed credit component ($/yr)
+  // Rate-based credit component: dollars per kWh drawn during VPP events x expected event
+  // energy per year. Optional so quotes saved before these fields existed still load.
+  vppEventRatePerKwh?: number
+  vppEventKwhPerYear?: number
 }
 
 export interface BatterySimResult {

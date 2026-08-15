@@ -23,6 +23,9 @@ export function BatteryPage() {
   const deleteQuote = useBatteryStore((s) => s.deleteQuote)
   const results = useBatteryStore((s) => s.results)
   const setResult = useBatteryStore((s) => s.setResult)
+  const draftQuote = useBatteryStore((s) => s.draftQuote)
+  const updateDraftQuote = useBatteryStore((s) => s.updateDraftQuote)
+  const setDraftTariffId = useBatteryStore((s) => s.setDraftTariffId)
 
   const [current, setCurrent] = useState<{ quote: BatteryQuote; plan: TariffPlan; result: BatterySimResult } | null>(null)
   const [topTab, setTopTab] = useState('strategy')
@@ -38,6 +41,23 @@ export function BatteryPage() {
 
   const applyFromPlanner = (quote: BatteryQuote, tariffId: string) => {
     runSimulation(quote, tariffId)
+    setTopTab('configure')
+  }
+
+  // "Play back" a saved quote: load it into the shared draft (so the form shows its
+  // parameters and further runs update it in place) and, if it has a stored result
+  // against a plan that still exists, show that result immediately.
+  const loadQuote = (q: BatteryQuote) => {
+    updateDraftQuote(q)
+    const resultEntry = Object.entries(results).find(([key]) => key.startsWith(`${q.id}_`))
+    if (resultEntry) {
+      const tariffId = resultEntry[0].slice(q.id.length + 1)
+      const plan = plans.find((p) => p.id === tariffId)
+      if (plan) {
+        setDraftTariffId(plan.id)
+        setCurrent({ quote: q, plan, result: resultEntry[1] })
+      }
+    }
     setTopTab('configure')
   }
 
@@ -98,7 +118,10 @@ export function BatteryPage() {
                 const result = resultEntry?.[1]
                 return (
                   <TableRow key={q.id}>
-                    <TableCell>{q.name}</TableCell>
+                    <TableCell>
+                      {q.name}
+                      {draftQuote.id === q.id && <span className="ml-2 text-xs text-muted-foreground">(loaded)</span>}
+                    </TableCell>
                     <TableCell>{q.capacityKwh} kWh</TableCell>
                     <TableCell>${q.totalCostAud.toFixed(0)}</TableCell>
                     <TableCell>
@@ -107,7 +130,10 @@ export function BatteryPage() {
                     <TableCell>
                       {result && Number.isFinite(result.simplePaybackYears) ? `${result.simplePaybackYears.toFixed(1)} yrs` : '-'}
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="whitespace-nowrap">
+                      <Button variant="ghost" size="sm" onClick={() => loadQuote(q)}>
+                        Load
+                      </Button>
                       <Button variant="ghost" size="sm" onClick={() => deleteQuote(q.id)}>
                         Delete
                       </Button>

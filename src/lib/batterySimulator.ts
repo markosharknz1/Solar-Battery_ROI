@@ -240,7 +240,9 @@ export function simulateBattery(intervals: Interval[], quote: BatteryQuote, plan
   const annualEquivCycles = avgDailyCycles * 365
 
   const annualSavingsAud = (baseline.totalCostAud - withBattery.totalCostAud) * factor
-  const vppCreditAud = quote.vppEnrolled ? quote.vppAnnualCreditAud : 0
+  const vppCreditAud = quote.vppEnrolled
+    ? quote.vppAnnualCreditAud + (quote.vppEventRatePerKwh ?? 0) * (quote.vppEventKwhPerYear ?? 0)
+    : 0
   const totalAnnualBenefit = annualSavingsAud + vppCreditAud
   const simplePaybackYears = totalAnnualBenefit > 0 ? quote.totalCostAud / totalAnnualBenefit : Number.POSITIVE_INFINITY
 

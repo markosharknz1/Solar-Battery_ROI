@@ -1,6 +1,9 @@
+import { useState } from 'react'
 import type { BatteryQuote, BatterySimResult } from '@/types/battery'
 import type { TariffPlan } from '@/types/tariff'
+import { Button } from '@/components/ui/button'
 import { Card, CardHeader, CardTitle } from '@/components/ui/card'
+import { BatteryReport } from '@/components/battery/BatteryReport'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { SavingsBreakdownChart } from '@/components/battery/SavingsBreakdownChart'
 import { MonthlySavingsChart } from '@/components/battery/MonthlySavingsChart'
@@ -21,6 +24,7 @@ export function BatteryResults({
   plan: TariffPlan
   totalDays: number
 }) {
+  const [showReport, setShowReport] = useState(false)
   const advice = getSizingAdvice(result, totalDays)
   const importReductionPct =
     result.annualGridImportKwhBase > 0
@@ -29,6 +33,12 @@ export function BatteryResults({
 
   return (
     <div className="space-y-4">
+      <div className="flex justify-end">
+        <Button variant="outline" size="sm" onClick={() => setShowReport(true)}>
+          Export PDF report
+        </Button>
+      </div>
+      {showReport && <BatteryReport result={result} quote={quote} plan={plan} onClose={() => setShowReport(false)} />}
       <div className="grid gap-3 sm:grid-cols-4">
         <Card>
           <CardHeader>

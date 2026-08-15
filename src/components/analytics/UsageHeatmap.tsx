@@ -9,7 +9,10 @@ type Metric = 'usage' | 'export' | 'net'
 
 // Shared column template so the cell grid and the time-label row are guaranteed to
 // align by construction (both are the same CSS grid, not two independently-sized rows).
-const GRID_TEMPLATE_COLUMNS = '2rem repeat(48, 12px)'
+// Flexible columns (1fr) let the grid fill the full card width on large/fullscreen
+// windows; the min-width on the grid keeps cells legible on narrow windows, where the
+// parent's overflow-x scroll takes over.
+const GRID_TEMPLATE_COLUMNS = '2rem repeat(48, minmax(8px, 1fr))'
 const LABEL_SLOTS: Record<number, string> = { 0: '00:00', 12: '06:00', 24: '12:00', 36: '18:00', 47: '23:30' }
 
 const SEASON_MONTHS: Record<Season, string> = {
@@ -125,14 +128,16 @@ export function UsageHeatmap({
         </Select>
       </div>
 
-      <div className="max-h-[520px] space-y-5 overflow-y-auto overflow-x-auto pr-1">
+      {/* Scroll area grows with the window: at least 520px, and on tall/fullscreen windows
+          everything above the fold minus the page chrome - so all seasons show when they fit. */}
+      <div className="max-h-[max(520px,calc(100vh_-_290px))] space-y-5 overflow-y-auto overflow-x-auto pr-1">
         {seasonGrids.map(({ season, days, grid }) => (
           <div key={season}>
             <p className="mb-1 text-xs font-medium text-[var(--viz-text-primary)]">
               {season} <span className="font-normal text-[var(--viz-text-muted)]">({SEASON_MONTHS[season]} - {days} day{days === 1 ? '' : 's'} of data)</span>
             </p>
             <div
-              className="inline-grid items-center gap-[2px]"
+              className="grid w-full min-w-[680px] items-center gap-[2px]"
               style={{ gridTemplateColumns: GRID_TEMPLATE_COLUMNS }}
               role="img"
               aria-label={`Heatmap of average ${metric} by weekday and time of day for ${season}`}
@@ -143,7 +148,7 @@ export function UsageHeatmap({
                   {row.map((value, s) => (
                     <div
                       key={s}
-                      className="h-4 w-3"
+                      className="h-4 w-full"
                       style={{
                         backgroundColor: sequentialScale(Math.min(1, value / p95), isDark),
                         borderBottom: isInEvWindow(s) ? '2px solid var(--viz-series-4)' : undefined,
