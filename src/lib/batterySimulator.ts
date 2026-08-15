@@ -38,6 +38,7 @@ const usesOffPeak = (chargePriority: BatteryQuote['chargePriority']) => chargePr
 
 export function simulateBattery(intervals: Interval[], quote: BatteryQuote, plan: TariffPlan): BatterySimResult {
   const sorted = [...intervals].sort((a, b) => (a.dateStr === b.dateStr ? a.slot - b.slot : a.dateStr.localeCompare(b.dateStr)))
+  const rates = sorted.map((i) => resolveRate(plan, i))
 
   const midLifeFraction = 1 - (quote.totalDegradationPercent / 100) * 0.5
   const effectiveCapacity = quote.capacityKwh * midLifeFraction
@@ -46,6 +47,28 @@ export function simulateBattery(intervals: Interval[], quote: BatteryQuote, plan
   const maxDischargePerInterval = quote.maxDischargeKw * 0.5
   const hasInverterData = sorted.some((i) => i.solarGen > 0)
   const captureCurtailment = quote.exportLimitKw !== null && hasInverterData
+
+  // Hold-for-peak dispatch pre-pass. On plans with a shoulder rate, greedy "discharge at any
+  // non-off-peak rate" drains the battery at the morning shoulder and leaves it empty for the
+  // evening peak. The simulator has the whole day's data, so per interval we know how much
+  // top-rate import is still to come today (capped at deliverable power) - during cheaper
+  // dischargeable periods the battery keeps that much in reserve and only spends the surplus.
+  const RATE_EPS = 1e-6
+  const dayMaxRate = new Array<number>(sorted.length)
+  const topDemandAfter = new Array<number>(sorted.length)
+  for (let start = 0; start < sorted.length; ) {
+    let end = start
+    while (end < sorted.length && sorted[end].dateStr === sorted[start].dateStr) end++
+    let maxRate = 0
+    for (let i = start; i < end; i++) maxRate = Math.max(maxRate, rates[i].ratePerKwh)
+    let demand = 0
+    for (let i = end - 1; i >= start; i--) {
+      topDemandAfter[i] = demand
+      dayMaxRate[i] = maxRate
+      if (rates[i].ratePerKwh >= maxRate - RATE_EPS) demand += Math.min(sorted[i].gridImport, maxDischargePerInterval)
+    }
+    start = end
+  }
 
   let soc = floorSoc
 
@@ -63,8 +86,9 @@ export function simulateBattery(intervals: Interval[], quote: BatteryQuote, plan
   let eveningLoadSum = 0
   let eveningLoadCount = 0
 
-  for (const interval of sorted) {
-    const rate = resolveRate(plan, interval)
+  for (let idx = 0; idx < sorted.length; idx++) {
+    const interval = sorted[idx]
+    const rate = rates[idx]
     let gridImport = interval.gridImport
     let gridExport = interval.gridExport
     let chargedThisInterval = 0
@@ -123,11 +147,14 @@ export function simulateBattery(intervals: Interval[], quote: BatteryQuote, plan
       }
     }
 
-    // Step 4: peak discharge
+    // Step 4: peak discharge. In peak_only mode, cheaper-but-dischargeable periods (shoulder)
+    // only get the surplus above what today's remaining top-rate imports will need.
     if (gridImport > 0) {
       const shouldDischarge = quote.dischargePriority === 'any_import' || (quote.dischargePriority === 'peak_only' && isDischargeableWindow(rate.periodName))
       if (shouldDischarge) {
-        const available = Math.max(0, soc - floorSoc)
+        const isTopRate = rate.ratePerKwh >= dayMaxRate[idx] - RATE_EPS
+        const holdForPeak = quote.dischargePriority === 'peak_only' && !isTopRate ? topDemandAfter[idx] : 0
+        const available = Math.max(0, soc - floorSoc - holdForPeak)
         const discharge = Math.min(gridImport, available, maxDischargePerInterval)
         if (discharge > 0) {
           soc -= discharge
@@ -241,10 +268,11 @@ export function simulateBattery(intervals: Interval[], quote: BatteryQuote, plan
   // Arbitrage value: kWh charged during the arbitrage window valued at the spread between the
   // plan's peak-period rate and the arbitrage-window rate (a proxy - the simulator doesn't track
   // provenance of stored energy through to discharge).
-  const peakRates = sorted.filter((i) => isDischargeableWindow(resolveRate(plan, i).periodName)).map((i) => resolveRate(plan, i).ratePerKwh)
+  const peakRates = sorted.map((_, i) => i).filter((i) => rates[i].ratePerKwh >= dayMaxRate[i] - RATE_EPS).map((i) => rates[i].ratePerKwh)
   const arbitrageRates = sorted
-    .filter((i) => slotInWindow(quote.arbitrageStartTime, quote.arbitrageEndTime, i.slot))
-    .map((i) => resolveRate(plan, i).ratePerKwh)
+    .map((_, i) => i)
+    .filter((i) => slotInWindow(quote.arbitrageStartTime, quote.arbitrageEndTime, sorted[i].slot))
+    .map((i) => rates[i].ratePerKwh)
   const avgPeakRate = peakRates.length > 0 ? peakRates.reduce((a, r) => a + r, 0) / peakRates.length : 0
   const avgArbitrageRate = arbitrageRates.length > 0 ? arbitrageRates.reduce((a, r) => a + r, 0) / arbitrageRates.length : 0
   const arbitrageAnnualValueAud = totalArbitrageChargedKwh * factor * Math.max(0, avgPeakRate - avgArbitrageRate)
@@ -334,11 +362,21 @@ export function previewStrategyOnAverageDay(
   const maxChargePerSlot = quote.maxChargeKw * 0.5
   const maxDischargePerSlot = quote.maxDischargeKw * 0.5
 
-  const avgRate = avgDay.length > 0 ? avgDay.reduce((a, s) => a + s.tariffRate, 0) / avgDay.length : 0
+  // Same hold-for-peak logic as simulateBattery: at cheaper dischargeable slots, keep enough
+  // in reserve to cover the rest of the day's top-rate imports; spend only the surplus.
+  const RATE_EPS = 1e-6
+  const maxRate = avgDay.reduce((a, s) => Math.max(a, s.tariffRate), 0)
+  const topDemandAfter = new Array<number>(avgDay.length).fill(0)
+  for (let i = avgDay.length - 2; i >= 0; i--) {
+    const next = avgDay[i + 1]
+    topDemandAfter[i] =
+      topDemandAfter[i + 1] + (next.tariffRate >= maxRate - RATE_EPS ? Math.min(next.avgGridImport, maxDischargePerSlot) : 0)
+  }
+  const inChargeWindow = (s: number) => chargeWindows.some((w) => slotInWindow(w.fromTime, w.toTime, s))
 
   let soc = floorSoc
 
-  return avgDay.map((slot) => {
+  return avgDay.map((slot, idx) => {
     // Charge windows (grid arbitrage)
     for (const w of chargeWindows) {
       if (slotInWindow(w.fromTime, w.toTime, slot.slot)) {
@@ -359,9 +397,11 @@ export function previewStrategyOnAverageDay(
 
     // Discharge to meet import
     if (slot.avgGridImport > 0) {
-      const shouldDischarge = dischargeStrategy === 'any_import' || slot.tariffRate >= avgRate
+      const shouldDischarge = dischargeStrategy === 'any_import' || !inChargeWindow(slot.slot)
       if (shouldDischarge) {
-        const available = Math.max(0, soc - floorSoc)
+        const isTopRate = slot.tariffRate >= maxRate - RATE_EPS
+        const holdForPeak = dischargeStrategy === 'peak_only' && !isTopRate ? topDemandAfter[idx] : 0
+        const available = Math.max(0, soc - floorSoc - holdForPeak)
         const discharge = Math.min(slot.avgGridImport, available, maxDischargePerSlot)
         soc -= discharge
       }

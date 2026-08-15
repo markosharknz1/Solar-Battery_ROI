@@ -283,6 +283,10 @@ export function StrategyPlanner({
                 Any grid import
               </label>
             </div>
+            <p className="mt-2 text-xs text-muted-foreground">
+              "Peak rate only" holds enough charge to cover the rest of the day's top-rate usage, and only spends the surplus during
+              cheaper shoulder periods - so the battery is never empty when the peak rate starts.
+            </p>
             <label className="mt-2 flex items-center gap-2 text-sm">
               <Checkbox checked={useSolar} onCheckedChange={(v) => updatePlanner({ useSolar: v === true })} />
               Charge from solar surplus
