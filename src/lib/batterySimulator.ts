@@ -184,6 +184,22 @@ export function simulateBattery(intervals: Interval[], quote: BatteryQuote, plan
   const baseline = calculateCost(sorted, plan)
   const withBattery = calculateCost(modified, plan)
 
+  // Measured saving per calendar month of uploaded data. Fixed charges are identical in both
+  // runs, so the per-month net-cost delta is purely the battery's doing.
+  const withBatteryByMonth = new Map(withBattery.byMonth.map((m) => [m.month, m.costAud]))
+  const daysByMonth = new Map<string, Set<string>>()
+  for (const i of sorted) {
+    const key = i.dateStr.slice(0, 7)
+    const set = daysByMonth.get(key) ?? new Set()
+    set.add(i.dateStr)
+    daysByMonth.set(key, set)
+  }
+  const monthlySavings = baseline.byMonth.map((m) => ({
+    month: m.month,
+    savingsAud: m.costAud - (withBatteryByMonth.get(m.month) ?? m.costAud),
+    days: daysByMonth.get(m.month)?.size ?? 0,
+  }))
+
   const totalDays = new Set(sorted.map((i) => i.dateStr)).size
   const factor = annualizeFactor(totalDays)
 
@@ -308,6 +324,7 @@ export function simulateBattery(intervals: Interval[], quote: BatteryQuote, plan
     curtailmentCapturePercent: totalCurtailedKwh > 0 ? (totalCurtailmentCapturedKwh / totalCurtailedKwh) * 100 : 0,
     peakCurtailmentSlot,
     dailySoc,
+    monthlySavings,
     arbitrageAnnualValueAud,
     estimatedBackupHoursAvg,
     estimatedBackupHoursMax,

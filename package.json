@@ -1,7 +1,7 @@
 {
   "name": "powerbudget",
   "private": true,
-  "version": "1.2.8",
+  "version": "1.2.9",
   "description": "Analyse smart meter data, model tariffs, and simulate battery storage - entirely on your device.",
   "author": "Solar & Battery Advisor",
   "type": "module",

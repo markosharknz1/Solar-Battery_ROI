@@ -3,6 +3,7 @@ import type { TariffPlan } from '@/types/tariff'
 import { Card, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { SavingsBreakdownChart } from '@/components/battery/SavingsBreakdownChart'
+import { MonthlySavingsChart } from '@/components/battery/MonthlySavingsChart'
 import { SocChart } from '@/components/battery/SocChart'
 import { PaybackChart } from '@/components/battery/PaybackChart'
 import { CycleWarrantyPanel } from '@/components/battery/CycleWarrantyPanel'
@@ -78,6 +79,7 @@ export function BatteryResults({
       <Tabs defaultValue="breakdown" className="space-y-4">
         <TabsList>
           <TabsTrigger value="breakdown">Savings breakdown</TabsTrigger>
+          <TabsTrigger value="monthly">Monthly savings</TabsTrigger>
           <TabsTrigger value="soc">State of charge</TabsTrigger>
           <TabsTrigger value="payback">Payback</TabsTrigger>
           <TabsTrigger value="cycles">Cycles &amp; warranty</TabsTrigger>
@@ -86,6 +88,9 @@ export function BatteryResults({
         </TabsList>
         <TabsContent value="breakdown">
           <SavingsBreakdownChart result={result} />
+        </TabsContent>
+        <TabsContent value="monthly">
+          <MonthlySavingsChart result={result} />
         </TabsContent>
         <TabsContent value="soc">
           <SocChart result={result} capacityKwh={quote.capacityKwh} />

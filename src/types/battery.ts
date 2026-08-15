@@ -89,6 +89,10 @@ export interface BatterySimResult {
   // Day-by-day for SoC chart
   dailySoc: Array<{ date: string; avgSocKwh: number; cyclesFraction: number }>
 
+  // Month-by-month measured savings over the uploaded data (not annualised).
+  // Optional: absent on results persisted before this field existed - re-run to populate.
+  monthlySavings?: Array<{ month: string; savingsAud: number; days: number }>
+
   // Arbitrage
   arbitrageAnnualValueAud: number
 
