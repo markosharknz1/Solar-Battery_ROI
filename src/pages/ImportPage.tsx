@@ -4,9 +4,7 @@ import { MeterUploader } from '@/components/import/MeterUploader'
 import { SolarUploader } from '@/components/import/SolarUploader'
 import { BillFallbackForm } from '@/components/import/BillFallbackForm'
 import { ImportSummary } from '@/components/import/ImportSummary'
-import { HouseholdProfileForm } from '@/components/import/HouseholdProfileForm'
 import { KeepDataToggle } from '@/components/import/KeepDataToggle'
-import { OvernightLoadPicker } from '@/components/import/OvernightLoadPicker'
 import { useDataStore } from '@/store/dataStore'
 import { parseMeterCsv } from '@/lib/csvParser'
 import { Button } from '@/components/ui/button'
@@ -26,8 +24,8 @@ export function ImportPage() {
   return (
     <div className="mx-auto max-w-4xl">
       <PageHeader
-        title="Import your usage data"
-        description="Everything below stays in your browser - nothing is ever uploaded to a server."
+        title="NEM data input"
+        description="Import your smart meter (NEM12 or retailer CSV) and solar inverter data. Everything stays on this device - nothing is ever uploaded to a server."
       />
       <div className="mb-6 grid gap-6 sm:grid-cols-2">
         <MeterUploader />
@@ -51,14 +49,6 @@ export function ImportPage() {
           </Button>
         </div>
       </div>
-      <div className="mb-6">
-        <HouseholdProfileForm />
-      </div>
-      {summary && !summary.isFlatEstimate && (
-        <div className="mb-6">
-          <OvernightLoadPicker />
-        </div>
-      )}
       {summary && <ImportSummary />}
     </div>
   )

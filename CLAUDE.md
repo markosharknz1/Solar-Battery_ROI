@@ -23,9 +23,15 @@ for the installer.
   in via the keep-data toggle (`dataStore` persists meter buckets then and rebuilds
   intervals in persist's `merge()`). **Schema changes: bump the persist `version`,
   don't write migrations** (no real user base to migrate).
-- `src/pages/`, `src/components/<area>/` - UI. Simple mode owns `/`, Advanced adds nav.
+- `src/pages/`, `src/components/<area>/` - UI. No mode system (Simple/Advanced was
+  removed in v1.4.0): one nav with input tabs (NEM data `/import`, Bills, Battery,
+  VPP, Household `/household`) + analysis tabs (Overview, Tariffs, Compare, Analytics).
+  `/` redirects to `/overview` (data loaded) or `/import` (fresh).
 - `electron/main.js` - tiny embedded HTTP server with SPA fallback (BrowserRouter
   needs it), then a chromeless BrowserWindow. No node_modules ship in the asar.
+  **The server port must stay fixed** (ladder starting at 8317): localStorage is
+  origin-scoped INCLUDING the port, so a random port wipes all persisted state
+  (plans, quotes, VPP programs) on every app launch.
 - `build-installer.ps1` / `install.bat` / `build-and-install.bat` - build tooling,
   self-locating via `$PSScriptRoot`/`%~dp0`, auto-`npm install` when needed.
 - `INSTALL.md` - user-facing install doc (written for GitHub novices; keep it that way).

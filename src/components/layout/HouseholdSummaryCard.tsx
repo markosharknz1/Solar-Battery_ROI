@@ -37,7 +37,7 @@ export function HouseholdSummaryCard() {
     <Card>
       <CardHeader className="flex flex-row items-start justify-between">
         <CardTitle>Household summary</CardTitle>
-        <Link to="/import" className="text-sm text-primary hover:underline">
+        <Link to="/household" className="text-sm text-primary hover:underline">
           Edit →
         </Link>
       </CardHeader>

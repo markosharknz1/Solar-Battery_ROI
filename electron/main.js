@@ -20,12 +20,18 @@ const MIME_TYPES = {
   '.ico': 'image/x-icon',
 }
 
+// The port MUST be stable across launches: localStorage (tariff plans, battery quotes, VPP
+// programs, the keep-data meter store) is scoped to the origin INCLUDING the port, so a random
+// port (listen(0)) silently wiped everything on every app restart. Try a fixed ladder so a
+// one-off conflict still lands on the same second choice next time.
+const PORT_LADDER = [8317, 8318, 8319, 8320]
+
 /**
  * Minimal static file server with SPA fallback (any unmatched path serves index.html), so the
  * app's BrowserRouter works exactly as it does under `vite preview` - without this, deep routes
  * like /battery would 404 when loaded directly instead of falling back to the client router.
  */
-function startServer() {
+function startServer(port) {
   return new Promise((resolve, reject) => {
     const server = createServer(async (req, res) => {
       try {
@@ -47,12 +53,23 @@ function startServer() {
       }
     })
     server.on('error', reject)
-    server.listen(0, '127.0.0.1', () => resolve(server))
+    server.listen(port, '127.0.0.1', () => resolve(server))
   })
 }
 
+async function startServerOnLadder() {
+  for (const port of PORT_LADDER) {
+    try {
+      return await startServer(port)
+    } catch (err) {
+      if (err?.code !== 'EADDRINUSE') throw err
+    }
+  }
+  throw new Error(`All ports in ${PORT_LADDER.join(', ')} are in use`)
+}
+
 async function createWindow() {
-  const server = await startServer()
+  const server = await startServerOnLadder()
   const { port } = server.address()
 
   const win = new BrowserWindow({

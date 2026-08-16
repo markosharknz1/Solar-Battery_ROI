@@ -1,9 +1,9 @@
-import { useEffect, lazy, Suspense } from 'react'
-import { Routes, Route, useNavigate } from 'react-router-dom'
+import { lazy, Suspense } from 'react'
+import { Routes, Route, Navigate } from 'react-router-dom'
 import { Nav } from '@/components/layout/Nav'
-import { SimpleModePage } from '@/pages/SimpleModePage'
 import { AdvancedOverviewPage } from '@/pages/AdvancedOverviewPage'
 import { ImportPage } from '@/pages/ImportPage'
+import { HouseholdPage } from '@/pages/HouseholdPage'
 import { TariffsPage } from '@/pages/TariffsPage'
 import { BatteryPage } from '@/pages/BatteryPage'
 import { ComparePage } from '@/pages/ComparePage'
@@ -11,26 +11,16 @@ import { VppPage } from '@/pages/VppPage'
 import { AnalyticsPage } from '@/pages/AnalyticsPage'
 import { BillsPage } from '@/pages/BillsPage'
 import { useImportSharedLink } from '@/hooks/useImportSharedLink'
-import { useUiStore } from '@/store/uiStore'
+import { useDataStore } from '@/store/dataStore'
 
 // Lazy-loaded: pulls in pdfjs-dist (a multi-MB parser + worker), which would otherwise bloat
 // the main bundle for every visitor even though only PDF-bill imports need it.
 const ImportBillPage = lazy(() => import('@/pages/ImportBillPage').then((m) => ({ default: m.ImportBillPage })))
 
-// Redirects "/" to "/overview" only when Advanced mode was already active on arrival (e.g. a
-// fresh load or browser-back into "/") - a mount-only effect, not a reactive <Navigate>, so it
-// doesn't race with programmatic navigation triggered elsewhere (e.g. Simple mode's CTA button
-// changing mode and navigating to /battery in the same click).
+// "/" lands on the overview when data is loaded, otherwise on the NEM data input page.
 function RootRoute() {
-  const mode = useUiStore((s) => s.mode)
-  const navigate = useNavigate()
-
-  useEffect(() => {
-    if (mode === 'advanced') navigate('/overview', { replace: true })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
-  return <SimpleModePage />
+  const hasData = useDataStore((s) => s.summary !== null)
+  return <Navigate to={hasData ? '/overview' : '/import'} replace />
 }
 
 function App() {
@@ -53,6 +43,7 @@ function App() {
           <Route path="/tariffs" element={<TariffsPage />} />
           <Route path="/battery" element={<BatteryPage />} />
           <Route path="/vpp" element={<VppPage />} />
+          <Route path="/household" element={<HouseholdPage />} />
           <Route path="/compare" element={<ComparePage />} />
           <Route path="/analytics" element={<AnalyticsPage />} />
           <Route path="/bills" element={<BillsPage />} />

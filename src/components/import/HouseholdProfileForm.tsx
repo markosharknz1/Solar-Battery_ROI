@@ -12,10 +12,10 @@ import { STATE_LABELS } from '@/lib/stateDefaults'
 import { resolveStateFromPostcode } from '@/lib/solarYield'
 import { ChevronDown } from 'lucide-react'
 
-export function HouseholdProfileForm() {
+export function HouseholdProfileForm({ defaultOpen = false }: { defaultOpen?: boolean }) {
   const profile = useDataStore((s) => s.householdProfile)
   const setProfile = useDataStore((s) => s.setProfile)
-  const [open, setOpen] = useState(false)
+  const [open, setOpen] = useState(defaultOpen)
 
   const onPostcodeChange = (postcode: string) => {
     const detected = resolveStateFromPostcode(postcode)
