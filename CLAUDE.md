@@ -17,6 +17,8 @@ for the installer.
   - `batterySimulator.ts` (4-step loop: arbitrage -> curtailment -> solar -> peak discharge)
   - `billFields.ts` (PDF bill text -> fields + TOU rates; **pure, Node-testable** - pdfjs stays in `billPdfParser.ts` because its `?url` worker import is Vite-only)
   - `billToPlan.ts`, `billReconciliation.ts`, `seasonalAnalysis.ts`, `solarYield.ts`
+  - `vpp.ts` (VPP program net-annual-value; programs live in `vppStore`, page `/vpp`,
+    selected per battery quote - rebate reduces effective cost for payback)
 - `src/store/` - Zustand stores. Interval data is session-only unless the user opts
   in via the keep-data toggle (`dataStore` persists meter buckets then and rebuilds
   intervals in persist's `merge()`). **Schema changes: bump the persist `version`,
