@@ -1,3 +1,23 @@
+/** One rate x estimated-energy line of a VPP program (an export credit or an import charge). */
+export interface VppLineItem {
+  id: string
+  label: string // e.g. "Event exports", "Peak demand response"
+  ratePerKwh: number // dollars/kWh
+  kwhPerYear: number // estimated energy per year at this rate
+}
+
+/** A Virtual Power Plant program, configured on the VPP page and selectable per battery quote. */
+export interface VppProgram {
+  id: string
+  name: string
+  provider: string
+  upfrontRebateAud: number // one-off signup rebate - reduces the battery's effective cost for payback
+  fixedAnnualCreditAud: number // membership/sign-on credits paid regardless of events
+  exportCredits: VppLineItem[] // energy the program draws/exports from your battery - you get paid
+  importCharges: VppLineItem[] // extra energy you buy under the program's terms - you pay
+  notes: string
+}
+
 export interface BatteryQuote {
   id: string
   name: string // e.g. "Tesla Powerwall 2 quote"
@@ -40,11 +60,12 @@ export interface BatteryQuote {
   inverterKw: number | null
   exportLimitKw: number | null
 
-  // VPP
+  // VPP: quotes reference a program configured on the VPP page. The legacy inline fields
+  // below are kept so quotes saved by older versions still simulate the same way; the UI
+  // no longer edits them.
+  vppProgramId?: string | null
   vppEnrolled: boolean
-  vppAnnualCreditAud: number // fixed credit component ($/yr)
-  // Rate-based credit component: dollars per kWh drawn during VPP events x expected event
-  // energy per year. Optional so quotes saved before these fields existed still load.
+  vppAnnualCreditAud: number
   vppEventRatePerKwh?: number
   vppEventKwhPerYear?: number
 }
@@ -99,6 +120,10 @@ export interface BatterySimResult {
 
   // Arbitrage
   arbitrageAnnualValueAud: number
+
+  // VPP upfront rebate applied to this simulation (reduces effective cost for payback).
+  // Optional: absent on results saved before VPP programs existed.
+  vppRebateAud?: number
 
   // Backup
   estimatedBackupHoursAvg: number

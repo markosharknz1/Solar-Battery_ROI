@@ -5,6 +5,7 @@ import type { BatteryQuote, ChargeWindow } from '@/types/battery'
 import { computeAverageDay } from '@/lib/dataProcessor'
 import { previewStrategyOnAverageDay, simulateBattery } from '@/lib/batterySimulator'
 import { useBatteryStore } from '@/store/batteryStore'
+import { useVppStore } from '@/store/vppStore'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -90,6 +91,7 @@ export function StrategyPlanner({
   const updatePlanner = useBatteryStore((s) => s.updatePlanner)
   const draftTariffId = useBatteryStore((s) => s.draftTariffId)
   const setTariffId = useBatteryStore((s) => s.setDraftTariffId)
+  const vppPrograms = useVppStore((s) => s.programs)
   const tariffId = draftTariffId && plans.some((p) => p.id === draftTariffId) ? draftTariffId : (plans[0]?.id ?? '')
   const plan = plans.find((p) => p.id === tariffId)
 
@@ -134,8 +136,9 @@ export function StrategyPlanner({
   const quickResult = useMemo(() => {
     if (!plan) return null
     const quote = quoteFromDraft(params, chargeWindows, dischargeStrategy, useSolar)
-    return simulateBattery(intervals, quote, plan)
-  }, [intervals, plan, params, chargeWindows, dischargeStrategy, useSolar])
+    const vpp = vppPrograms.find((p) => p.id === params.vppProgramId) ?? null
+    return simulateBattery(intervals, quote, plan, vpp)
+  }, [intervals, plan, params, chargeWindows, dischargeStrategy, useSolar, vppPrograms])
 
   const addWindow = () =>
     setChargeWindows([...chargeWindows, { id: crypto.randomUUID(), fromTime: '23:00', toTime: '07:00', targetPercent: 80 }])

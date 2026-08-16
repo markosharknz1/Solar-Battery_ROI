@@ -1,4 +1,7 @@
+import { Link } from 'react-router-dom'
 import type { BatteryQuote } from '@/types/battery'
+import { useVppStore } from '@/store/vppStore'
+import { vppNetAnnualAud } from '@/lib/vpp'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import { Slider } from '@/components/ui/slider'
@@ -22,6 +25,8 @@ export function BatteryQuoteForm({
   const setTariffId = useBatteryStore((s) => s.setDraftTariffId)
   const plans = useTariffStore((s) => s.plans)
   const tariffId = draftTariffId && plans.some((p) => p.id === draftTariffId) ? draftTariffId : (plans[0]?.id ?? '')
+  const vppPrograms = useVppStore((s) => s.programs)
+  const selectedVpp = vppPrograms.find((p) => p.id === quote.vppProgramId) ?? null
 
   const usesArbitrage = quote.chargePriority === 'solar_then_arbitrage' || quote.chargePriority === 'arbitrage_only'
   const midLifeCapacity = quote.capacityKwh * (1 - (quote.totalDegradationPercent / 100) * 0.5)
@@ -246,48 +251,37 @@ export function BatteryQuoteForm({
       </div>
 
       <div className="rounded-md border p-3">
-        <div className="flex items-center justify-between">
-          <Label>Enrol in VPP program</Label>
-          <Switch checked={quote.vppEnrolled} onCheckedChange={(v) => update({ vppEnrolled: v })} />
-        </div>
-        {quote.vppEnrolled && (
-          <div className="mt-2 space-y-2">
-            <div>
-              <Label>Fixed annual credit ($/yr)</Label>
-              <Input type="number" value={quote.vppAnnualCreditAud} onChange={(e) => update({ vppAnnualCreditAud: Number(e.target.value) || 0 })} />
-              <p className="mt-1 text-xs text-muted-foreground">Sign-up or membership credits the program pays regardless of events.</p>
-            </div>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div>
-                <Label>Event credit rate (c/kWh)</Label>
-                <Input
-                  type="number"
-                  value={((quote.vppEventRatePerKwh ?? 0) * 100).toString()}
-                  onChange={(e) => update({ vppEventRatePerKwh: (Number(e.target.value) || 0) / 100 })}
-                />
-              </div>
-              <div>
-                <Label>Est. event energy (kWh/yr)</Label>
-                <Input
-                  type="number"
-                  value={quote.vppEventKwhPerYear ?? 0}
-                  onChange={(e) => update({ vppEventKwhPerYear: Number(e.target.value) || 0 })}
-                />
-              </div>
-            </div>
-            {(quote.vppEventRatePerKwh ?? 0) * (quote.vppEventKwhPerYear ?? 0) > 0 && (
-              <p className="text-xs font-medium">
-                Total VPP credit: $
-                {(quote.vppAnnualCreditAud + (quote.vppEventRatePerKwh ?? 0) * (quote.vppEventKwhPerYear ?? 0)).toFixed(0)}/yr
-              </p>
-            )}
-            <p className="text-xs text-muted-foreground">
-              Enter the rate your program pays per kWh drawn from your battery during grid events, and roughly how much
-              event energy it expects per year (both are in the program's terms). VPPs may affect battery availability
-              and warranty - check before enrolling.
-            </p>
-          </div>
+        <Label>VPP program</Label>
+        <Select
+          value={quote.vppProgramId ?? 'none'}
+          onValueChange={(v) => update({ vppProgramId: v === 'none' ? null : v })}
+        >
+          <SelectTrigger className="mt-1">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="none">None</SelectItem>
+            {vppPrograms.map((p) => (
+              <SelectItem key={p.id} value={p.id}>
+                {p.name}
+                {p.provider ? ` (${p.provider})` : ''}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        {selectedVpp && (
+          <p className="mt-2 text-xs font-medium">
+            ${vppNetAnnualAud(selectedVpp).toFixed(0)}/yr net credit
+            {selectedVpp.upfrontRebateAud > 0 && ` + $${selectedVpp.upfrontRebateAud.toFixed(0)} upfront rebate off the battery cost`}
+          </p>
         )}
+        <p className="mt-2 text-xs text-muted-foreground">
+          {vppPrograms.length === 0 ? 'No programs configured yet - set them up on the ' : 'Configure rebates, credits, and event rates on the '}
+          <Link to="/vpp" className="text-primary hover:underline">
+            VPP page
+          </Link>
+          .
+        </p>
       </div>
 
       <Button disabled={!tariffId} onClick={() => onRun(quote, tariffId)} className="w-full">

@@ -9,13 +9,15 @@ const links = [
   { to: '/overview', label: 'Overview' },
   { to: '/tariffs', label: 'Tariffs' },
   { to: '/battery', label: 'Battery' },
+  { to: '/vpp', label: 'VPP' },
   { to: '/compare', label: 'Compare' },
   { to: '/analytics', label: 'Analytics' },
   { to: '/bills', label: 'Bills' },
   { to: '/import', label: 'Import' },
 ]
 
-const ALWAYS_ENABLED = new Set(['/import', '/bills'])
+// VPP is pure configuration (no meter data needed), like Import/Bills.
+const ALWAYS_ENABLED = new Set(['/import', '/bills', '/vpp'])
 
 export function Nav() {
   const hasData = useDataStore((s) => s.summary !== null)

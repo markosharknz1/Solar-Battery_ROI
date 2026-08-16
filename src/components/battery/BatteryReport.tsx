@@ -44,6 +44,8 @@ export function BatteryReport({
   }, [])
 
   const vppCredit = result.vppCreditAud
+  const vppRebate = result.vppRebateAud ?? 0
+  const effectiveCostAud = Math.max(0, quote.totalCostAud - vppRebate)
   const annualBenefit = result.annualSavingsAud + vppCredit
 
   // Forward projection: measured annual saving grown by the user's electricity-price
@@ -58,9 +60,9 @@ export function BatteryReport({
   let running = 0
   const projectionRows = projection.map((p) => {
     running += p.saving
-    return { ...p, cumulative: running, net: running - quote.totalCostAud }
+    return { ...p, cumulative: running, net: running - effectiveCostAud }
   })
-  const paybackYear = projectionRows.find((r) => r.cumulative >= quote.totalCostAud)?.y ?? null
+  const paybackYear = projectionRows.find((r) => r.cumulative >= effectiveCostAud)?.y ?? null
 
   const dataWindow = summary
     ? `${format(summary.dateRange.start, 'd MMM yyyy')} to ${format(summary.dateRange.end, 'd MMM yyyy')} (${summary.totalDays} days of half-hourly meter data)`
@@ -68,7 +70,12 @@ export function BatteryReport({
 
   const quoteFacts: Array<[string, string]> = [
     ['Battery', `${quote.capacityKwh} kWh usable, ${quote.maxChargeKw} kW charge / ${quote.maxDischargeKw} kW discharge`],
-    ['Installed cost', `$${quote.totalCostAud.toFixed(0)}`],
+    [
+      'Installed cost',
+      vppRebate > 0
+        ? `$${quote.totalCostAud.toFixed(0)} - $${vppRebate.toFixed(0)} VPP rebate = $${effectiveCostAud.toFixed(0)} effective`
+        : `$${quote.totalCostAud.toFixed(0)}`,
+    ],
     ['Round-trip efficiency', `${(quote.roundTripEfficiency * 100).toFixed(0)}%`],
     ['Strategy', `${STRATEGY_LABELS[quote.chargePriority]}; discharge ${quote.dischargePriority === 'peak_only' ? 'during peak rates only' : 'on any grid import'}`],
     ['Tariff plan', plan.name],
@@ -77,7 +84,9 @@ export function BatteryReport({
       `${quote.warrantyYears} years${quote.warrantyThroughputMwh ? ` / ${quote.warrantyThroughputMwh} MWh throughput` : ''}`,
     ],
     ['Assumed degradation', `${quote.totalDegradationPercent}% over ${quote.lifetimeYears} years (straight-line)`],
-    ...(quote.vppEnrolled ? ([['VPP credit', `$${vppCredit.toFixed(0)}/yr`]] as Array<[string, string]>) : []),
+    ...(vppCredit !== 0 || vppRebate > 0
+      ? ([['VPP program', `$${vppCredit.toFixed(0)}/yr net credit${vppRebate > 0 ? ` + $${vppRebate.toFixed(0)} upfront rebate` : ''}`]] as Array<[string, string]>)
+      : []),
   ]
 
   const overlay = (
@@ -184,7 +193,7 @@ export function BatteryReport({
               <th className="py-1">Year</th>
               <th className="py-1 text-right">Projected saving</th>
               <th className="py-1 text-right">Cumulative</th>
-              <th className="py-1 text-right">Net vs ${quote.totalCostAud.toFixed(0)} cost</th>
+              <th className="py-1 text-right">Net vs ${effectiveCostAud.toFixed(0)} cost</th>
             </tr>
           </thead>
           <tbody>

@@ -4,6 +4,7 @@ import { PageHeader } from '@/components/layout/PageHeader'
 import { useDataStore } from '@/store/dataStore'
 import { useTariffStore } from '@/store/tariffStore'
 import { useBatteryStore } from '@/store/batteryStore'
+import { useVppStore } from '@/store/vppStore'
 import { BatteryQuoteForm } from '@/components/battery/BatteryQuoteForm'
 import { BatteryResults } from '@/components/battery/BatteryResults'
 import { StrategyPlanner } from '@/components/battery/StrategyPlanner'
@@ -24,6 +25,7 @@ export function BatteryPage() {
   const results = useBatteryStore((s) => s.results)
   const setResult = useBatteryStore((s) => s.setResult)
   const draftQuote = useBatteryStore((s) => s.draftQuote)
+  const vppPrograms = useVppStore((s) => s.programs)
   const updateDraftQuote = useBatteryStore((s) => s.updateDraftQuote)
   const setDraftTariffId = useBatteryStore((s) => s.setDraftTariffId)
 
@@ -33,7 +35,8 @@ export function BatteryPage() {
   const runSimulation = (quote: BatteryQuote, tariffId: string) => {
     const plan = plans.find((p) => p.id === tariffId)
     if (!plan) return
-    const result = simulateBattery(intervals, quote, plan)
+    const vpp = vppPrograms.find((p) => p.id === quote.vppProgramId) ?? null
+    const result = simulateBattery(intervals, quote, plan, vpp)
     addQuote(quote)
     setResult(`${quote.id}_${tariffId}`, result)
     setCurrent({ quote, plan, result })

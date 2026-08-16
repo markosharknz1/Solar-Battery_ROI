@@ -1,8 +1,9 @@
 import type { Interval } from '@/types/meter'
 import type { TariffPlan } from '@/types/tariff'
-import type { AverageDaySlot, BatteryQuote, BatterySimResult, ChargeWindow } from '@/types/battery'
+import type { AverageDaySlot, BatteryQuote, BatterySimResult, ChargeWindow, VppProgram } from '@/types/battery'
 import { calculateCost, resolveRate } from '@/lib/tariffCalculator'
 import { annualizeFactor } from '@/lib/annualize'
+import { vppNetAnnualAud } from '@/lib/vpp'
 
 function isOffPeakPeriod(name: string): boolean {
   return name.toLowerCase().includes('off') || name.toLowerCase().includes('free') || name.toLowerCase().includes('sponge')
@@ -36,7 +37,12 @@ const usesArbitrage = (chargePriority: BatteryQuote['chargePriority']) =>
   chargePriority === 'solar_then_arbitrage' || chargePriority === 'arbitrage_only'
 const usesOffPeak = (chargePriority: BatteryQuote['chargePriority']) => chargePriority === 'solar_then_offpeak'
 
-export function simulateBattery(intervals: Interval[], quote: BatteryQuote, plan: TariffPlan): BatterySimResult {
+export function simulateBattery(
+  intervals: Interval[],
+  quote: BatteryQuote,
+  plan: TariffPlan,
+  vpp?: VppProgram | null,
+): BatterySimResult {
   const sorted = [...intervals].sort((a, b) => (a.dateStr === b.dateStr ? a.slot - b.slot : a.dateStr.localeCompare(b.dateStr)))
   const rates = sorted.map((i) => resolveRate(plan, i))
 
@@ -240,11 +246,18 @@ export function simulateBattery(intervals: Interval[], quote: BatteryQuote, plan
   const annualEquivCycles = avgDailyCycles * 365
 
   const annualSavingsAud = (baseline.totalCostAud - withBattery.totalCostAud) * factor
-  const vppCreditAud = quote.vppEnrolled
-    ? quote.vppAnnualCreditAud + (quote.vppEventRatePerKwh ?? 0) * (quote.vppEventKwhPerYear ?? 0)
-    : 0
+  // VPP: a selected program supplies the annual credit (fixed + export credits - import
+  // charges) and an upfront rebate that reduces the cost the battery has to pay back.
+  // Quotes from older versions without a program fall back to their inline legacy fields.
+  const vppCreditAud = vpp
+    ? vppNetAnnualAud(vpp)
+    : quote.vppEnrolled
+      ? quote.vppAnnualCreditAud + (quote.vppEventRatePerKwh ?? 0) * (quote.vppEventKwhPerYear ?? 0)
+      : 0
+  const vppRebateAud = vpp?.upfrontRebateAud ?? 0
+  const effectiveCostAud = Math.max(0, quote.totalCostAud - vppRebateAud)
   const totalAnnualBenefit = annualSavingsAud + vppCreditAud
-  const simplePaybackYears = totalAnnualBenefit > 0 ? quote.totalCostAud / totalAnnualBenefit : Number.POSITIVE_INFINITY
+  const simplePaybackYears = totalAnnualBenefit > 0 ? effectiveCostAud / totalAnnualBenefit : Number.POSITIVE_INFINITY
 
   const annualKwhCycled = annualEquivCycles * effectiveCapacity
   const yearsTillThroughputExpiry = quote.warrantyThroughputMwh
@@ -328,6 +341,7 @@ export function simulateBattery(intervals: Interval[], quote: BatteryQuote, plan
     dailySoc,
     monthlySavings,
     arbitrageAnnualValueAud,
+    vppRebateAud,
     estimatedBackupHoursAvg,
     estimatedBackupHoursMax,
     importCostSavedAud: (baseline.importCostAud - withBattery.importCostAud) * factor,

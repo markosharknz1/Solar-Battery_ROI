@@ -7,6 +7,7 @@ import { ImportPage } from '@/pages/ImportPage'
 import { TariffsPage } from '@/pages/TariffsPage'
 import { BatteryPage } from '@/pages/BatteryPage'
 import { ComparePage } from '@/pages/ComparePage'
+import { VppPage } from '@/pages/VppPage'
 import { AnalyticsPage } from '@/pages/AnalyticsPage'
 import { BillsPage } from '@/pages/BillsPage'
 import { useImportSharedLink } from '@/hooks/useImportSharedLink'
@@ -51,6 +52,7 @@ function App() {
           <Route path="/import" element={<ImportPage />} />
           <Route path="/tariffs" element={<TariffsPage />} />
           <Route path="/battery" element={<BatteryPage />} />
+          <Route path="/vpp" element={<VppPage />} />
           <Route path="/compare" element={<ComparePage />} />
           <Route path="/analytics" element={<AnalyticsPage />} />
           <Route path="/bills" element={<BillsPage />} />
