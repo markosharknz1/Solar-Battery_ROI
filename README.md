@@ -1,5 +1,14 @@
 # Solar & Battery Advisor
 
+> ### ⬇ Want to install the app? Start here.
+> Download the ready-made installer - the **Setup `.exe`** under "Assets" on the
+> **[Releases page](../../releases/latest)** - run it, done. Nothing else is needed
+> (no Node.js, no ZIP). Full novice-friendly walkthrough: **[INSTALL.md](INSTALL.md)**.
+>
+> **Do not use the green "Code → Download ZIP" button** - that ZIP is source code
+> for developers. It is not the app, and its `.bat` files will not install anything
+> without a Node.js build environment.
+
 A client-side React web app that helps Australian households analyse their smart
 meter interval data, model time-of-use tariffs, simulate battery storage, compare
 power plans, and understand their solar generation.
@@ -11,8 +20,8 @@ device; usage data must be re-imported each session.
 
 ## Features
 
-- **Simple mode** — upload a CSV and get a quick "is a battery worth it?" verdict
-- **Advanced mode** — full multi-page app: Import, Tariffs, Battery, Compare, Analytics
+- Input tabs for every data source: NEM data (smart meter CSV), Bills (PDF import),
+  Battery quotes, VPP programs, and Household settings
 - CSV import for common AU retailer interval exports, AEMO NEM12 files, and solar
   inverter exports (SolarEdge, Fronius, SMA, Goodwe, Growatt)
 - Time-of-use tariff modelling with fixed charges, feed-in periods, controlled
