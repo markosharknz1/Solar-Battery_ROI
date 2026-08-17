@@ -4,6 +4,7 @@ import type { AverageDaySlot, BatteryQuote, BatterySimResult, ChargeWindow, VppP
 import { calculateCost, resolveRate } from '@/lib/tariffCalculator'
 import { annualizeFactor } from '@/lib/annualize'
 import { vppNetAnnualAud } from '@/lib/vpp'
+import { capacityFadeFraction, cycleAgingDominates, effectiveThroughputMwh } from '@/lib/batteryAging'
 
 function isOffPeakPeriod(name: string): boolean {
   return name.toLowerCase().includes('off') || name.toLowerCase().includes('free') || name.toLowerCase().includes('sponge')
@@ -259,25 +260,28 @@ export function simulateBattery(
   const totalAnnualBenefit = annualSavingsAud + vppCreditAud
   const simplePaybackYears = totalAnnualBenefit > 0 ? effectiveCostAud / totalAnnualBenefit : Number.POSITIVE_INFINITY
 
+  // Throughput warranty: an explicit MWh figure wins, else derived from the datasheet
+  // cycle-life rating (cycles x capacity x DoD).
   const annualKwhCycled = annualEquivCycles * effectiveCapacity
-  const yearsTillThroughputExpiry = quote.warrantyThroughputMwh
-    ? (quote.warrantyThroughputMwh * 1000) / (annualKwhCycled || 1)
-    : null
+  const throughputMwh = effectiveThroughputMwh(quote)
+  const yearsTillThroughputExpiry = throughputMwh ? (throughputMwh * 1000) / (annualKwhCycled || 1) : null
   const yearsTillYearWarrantyExpiry = quote.warrantyYears
   const effectiveWarrantyYears = yearsTillThroughputExpiry
     ? Math.min(quote.warrantyYears, yearsTillThroughputExpiry)
     : quote.warrantyYears
 
+  // Aging: capacityFadeFraction blends the calendar clock with the cycle clock (whichever
+  // runs faster wins), so heavy arbitrage dispatch degrades savings faster than idle use.
   let lifetimeKwhStoredAtWarranty = 0
   for (let y = 1; y <= Math.max(1, Math.round(effectiveWarrantyYears)); y++) {
-    const capAtYear = quote.capacityKwh * (1 - (quote.totalDegradationPercent / 100) * (y / quote.lifetimeYears))
+    const capAtYear = quote.capacityKwh * (1 - capacityFadeFraction(quote, annualEquivCycles, y))
     lifetimeKwhStoredAtWarranty += annualEquivCycles * capAtYear
   }
   const costPerKwhStored = lifetimeKwhStoredAtWarranty > 0 ? quote.totalCostAud / lifetimeKwhStoredAtWarranty : 0
 
   let lifetimeSavingsAud = 0
   for (let y = 1; y <= quote.lifetimeYears; y++) {
-    const degradedSavings = annualSavingsAud * (1 - (quote.totalDegradationPercent / 100) * (y / quote.lifetimeYears))
+    const degradedSavings = annualSavingsAud * Math.max(0, 1 - capacityFadeFraction(quote, annualEquivCycles, y))
     lifetimeSavingsAud += degradedSavings + vppCreditAud
   }
 
@@ -342,6 +346,8 @@ export function simulateBattery(
     monthlySavings,
     arbitrageAnnualValueAud,
     vppRebateAud,
+    cycleAgingDominates: cycleAgingDominates(quote, annualEquivCycles),
+    effectiveThroughputMwhUsed: throughputMwh,
     estimatedBackupHoursAvg,
     estimatedBackupHoursMax,
     importCostSavedAud: (baseline.importCostAud - withBattery.importCostAud) * factor,

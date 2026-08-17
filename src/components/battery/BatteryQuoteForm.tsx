@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom'
 import type { BatteryQuote } from '@/types/battery'
 import { useVppStore } from '@/store/vppStore'
 import { vppNetAnnualAud } from '@/lib/vpp'
+import { cycleLifeThroughputMwh } from '@/lib/batteryAging'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import { Slider } from '@/components/ui/slider'
@@ -94,7 +95,32 @@ export function BatteryQuoteForm({
               onChange={(e) => update({ warrantyThroughputMwh: e.target.value === '' ? null : Number(e.target.value) })}
             />
           </div>
+          <div>
+            <Label>Rated cycle life (cycles, optional)</Label>
+            <Input
+              type="number"
+              placeholder="e.g. 6000"
+              value={quote.ratedCycleLife ?? ''}
+              onChange={(e) => update({ ratedCycleLife: e.target.value === '' ? null : Number(e.target.value) })}
+            />
+          </div>
+          <div>
+            <Label>Rated depth of discharge (%)</Label>
+            <Input
+              type="number"
+              min={1}
+              max={100}
+              value={quote.ratedDodPercent ?? 100}
+              onChange={(e) => update({ ratedDodPercent: Number(e.target.value) || 100 })}
+            />
+          </div>
         </div>
+        <p className="mt-2 text-xs text-muted-foreground">
+          Datasheets usually quote endurance as cycles (e.g. "6000 cycles @ 90% DoD").
+          {quote.ratedCycleLife
+            ? ` This rating implies ~${(cycleLifeThroughputMwh(quote) ?? 0).toFixed(1)} MWh of lifetime throughput${quote.warrantyThroughputMwh ? ' (the explicit MWh figure above takes precedence)' : ', used for the warranty maths below'}. It also lets the simulator age the battery by how hard your strategy actually cycles it - heavy overnight arbitrage wears it faster than the calendar alone.`
+            : ' Enter it here if the warranty document has no MWh throughput figure.'}
+        </p>
       </div>
 
       <div className="rounded-md border p-3">

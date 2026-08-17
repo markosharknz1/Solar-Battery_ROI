@@ -84,10 +84,24 @@ export function CycleWarrantyPanel({
         </Card>
       </div>
 
-      {throughputExpiresFirst && (
-        <Badge variant="destructive" className="w-fit">
-          Throughput warranty expires before the year warranty
-        </Badge>
+      <div className="flex flex-wrap gap-2">
+        {throughputExpiresFirst && (
+          <Badge variant="destructive" className="w-fit">
+            Throughput warranty expires before the year warranty
+          </Badge>
+        )}
+        {result.cycleAgingDominates && (
+          <Badge variant="destructive" className="w-fit">
+            Cycle aging dominates - this strategy wears the battery faster than the calendar
+          </Badge>
+        )}
+      </div>
+
+      {result.effectiveThroughputMwhUsed != null && quote.warrantyThroughputMwh == null && quote.ratedCycleLife != null && (
+        <p className="text-xs text-muted-foreground">
+          Throughput warranty derived from the datasheet rating: {quote.ratedCycleLife} cycles @{' '}
+          {quote.ratedDodPercent ?? 100}% DoD = ~{result.effectiveThroughputMwhUsed.toFixed(1)} MWh lifetime.
+        </p>
       )}
 
       <div className="rounded-lg border p-4">

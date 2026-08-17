@@ -34,6 +34,11 @@ export interface BatteryQuote {
   // Warranty
   warrantyYears: number
   warrantyThroughputMwh: number | null
+  // Datasheet cycle-life rating (e.g. "6000 cycles @ 90% DoD"). Used to derive lifetime
+  // throughput when warrantyThroughputMwh is blank, and drives cycle-based aging.
+  // Optional so quotes saved before these fields existed still load.
+  ratedCycleLife?: number | null
+  ratedDodPercent?: number
 
   // Lifetime & degradation
   lifetimeYears: number // 1-15
@@ -124,6 +129,10 @@ export interface BatterySimResult {
   // VPP upfront rebate applied to this simulation (reduces effective cost for payback).
   // Optional: absent on results saved before VPP programs existed.
   vppRebateAud?: number
+
+  // Aging (optional: absent on results saved before cycle-based aging existed)
+  cycleAgingDominates?: boolean // dispatch cycles age this battery faster than the calendar
+  effectiveThroughputMwhUsed?: number | null // explicit warranty MWh, or derived from cycle life
 
   // Backup
   estimatedBackupHoursAvg: number

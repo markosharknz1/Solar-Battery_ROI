@@ -6,6 +6,7 @@ import type { TariffPlan } from '@/types/tariff'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useDataStore } from '@/store/dataStore'
+import { capacityFadeFraction } from '@/lib/batteryAging'
 
 function monthLabel(yyyyMm: string): string {
   const [y, m] = yyyyMm.split('-').map(Number)
@@ -49,11 +50,11 @@ export function BatteryReport({
   const annualBenefit = result.annualSavingsAud + vppCredit
 
   // Forward projection: measured annual saving grown by the user's electricity-price
-  // assumption, shrunk by straight-line battery degradation (same model as the simulator's
-  // lifetime figure). VPP credit is program-set, so it is not grown with prices.
+  // assumption, shrunk by the same blended aging model as the simulator (calendar clock vs
+  // cycle clock, whichever runs faster). VPP credit is program-set, so it is not grown.
   const projection = Array.from({ length: quote.lifetimeYears }, (_, i) => {
     const y = i + 1
-    const degradationFactor = 1 - (quote.totalDegradationPercent / 100) * (y / quote.lifetimeYears)
+    const degradationFactor = Math.max(0, 1 - capacityFadeFraction(quote, result.annualEquivCycles, y))
     const saving = result.annualSavingsAud * Math.pow(1 + growthPct / 100, y - 1) * degradationFactor + vppCredit
     return { y, saving }
   })
@@ -181,8 +182,12 @@ export function BatteryReport({
           Forward projection ({growthPct}%/yr price increase)
         </h2>
         <p className="mt-2 text-sm text-neutral-600">
-          Measured annual saving grown by {growthPct}% per year for electricity prices and reduced by straight-line
-          battery degradation ({quote.totalDegradationPercent}% over {quote.lifetimeYears} years).
+          Measured annual saving grown by {growthPct}% per year for electricity prices and reduced by battery aging
+          ({quote.totalDegradationPercent}% over {quote.lifetimeYears} years
+          {result.cycleAgingDominates
+            ? `, reached FASTER here because this strategy cycles the battery hard: ~${result.annualEquivCycles.toFixed(0)} cycles/yr against a ${quote.ratedCycleLife} cycle rating`
+            : ''}
+          ).
           {paybackYear
             ? ` On these assumptions the battery pays itself off during year ${paybackYear}.`
             : ` On these assumptions the battery does not reach payback within its ${quote.lifetimeYears}-year lifetime.`}
