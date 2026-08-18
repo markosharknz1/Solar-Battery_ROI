@@ -166,8 +166,8 @@ gh release create v<version> "release/Solar & Battery Advisor Setup <version>.ex
 ```
 
 Other scripts: `install.bat` silently installs whatever is already in
-`release\`; `start-app.ps1` runs from source without installing;
-`npm run dev` starts the hot-reload dev server.
+`release\`; `npm run dev` starts the hot-reload dev server; `npm run preview`
+serves the built app in a browser.
 
 If the build fails with `EPERM ... rename win-unpacked`: antivirus or indexing
 briefly locked freshly extracted files - the script already builds via a temp
