@@ -165,9 +165,11 @@ in `package.json`, build, then:
 gh release create v<version> "release/Solar & Battery Advisor Setup <version>.exe" --title "Solar & Battery Advisor <version>"
 ```
 
-Other scripts: `install.bat` silently installs whatever is already in
-`release\`; `npm run dev` starts the hot-reload dev server; `npm run preview`
-serves the built app in a browser.
+Other scripts: `install.vbs` silently installs whatever is already in
+`release\` with no window at all (double-click it - a small popup confirms
+when done); `install.bat` does the same but in a console window; `npm run dev`
+starts the hot-reload dev server; `npm run preview` serves the built app in
+a browser.
 
 If the build fails with `EPERM ... rename win-unpacked`: antivirus or indexing
 briefly locked freshly extracted files - the script already builds via a temp
