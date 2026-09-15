@@ -69,10 +69,14 @@ Edge/Chrome `--app=` window) + the official signed node.exe + one `.cmd`.
 `.edge-app-profile` INSIDE the extracted folder (portable; survives upgrades
 by extracting over). Ports must stay fixed - localStorage is origin-scoped.
 
-1. Bump `"version"` in package.json.
-2. `powershell -File build-zip.ps1` (builds, downloads + SHA-verifies the official
-   Node runtime, stages, zips to `release\Solar-Battery-Advisor-v<X>.zip`).
-3. `gh release create v<X> "release/Solar-Battery-Advisor-v<X>.zip" --title "Solar & Battery Advisor <X>"`
+**Releases are built by GitHub Actions since v1.5.1 - never `gh release create`
+by hand again.** To release: bump `"version"` in package.json, update
+RELEASE_NOTES.md (becomes the "What's new" body), commit + push, then
+`git tag -a vX.Y.Z -m vX.Y.Z && git push origin vX.Y.Z`. The workflow
+(`.github/workflows/release.yml`) verifies tag==package.json version, builds,
+fetches + SHA-verifies the official Node runtime, zips, scans the ZIP on
+VirusTotal (repo secret `VT_API_KEY`), and publishes with install steps,
+checksums, and the VT link. `build-zip.ps1` remains for LOCAL test builds only.
 Users install from the Releases page only - the repo ZIP is not the app.
 Legacy Electron tooling (`electron/`, `build-installer.ps1`, `install.bat`)
 remains for reference; releases no longer ship the exe.

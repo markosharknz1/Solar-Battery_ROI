@@ -1,0 +1,4 @@
+# cmd.exe needs CRLF (LF-only batch files misparse parenthesised blocks) -
+# guarantee it on every checkout, including the Linux release runner.
+*.cmd text eol=crlf
+*.bat text eol=crlf

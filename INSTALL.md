@@ -112,11 +112,12 @@ npm run build          # production build to dist\
 powershell -File build-zip.ps1   # build the release ZIP (downloads + verifies the official Node runtime)
 ```
 
-To publish a new version: bump `"version"` in `package.json`, run
-`build-zip.ps1`, then:
+To publish a new version: bump `"version"` in `package.json`, update
+`RELEASE_NOTES.md`, commit and push, then push a matching tag - GitHub
+Actions builds the ZIP, scans it on VirusTotal, and publishes the release:
 
 ```
-gh release create v<version> "release/Solar-Battery-Advisor-v<version>.zip" --title "Solar & Battery Advisor <version>"
+git tag -a v<version> -m v<version> && git push origin v<version>
 ```
 
 The legacy Electron installer tooling (`electron/`, `build-installer.ps1`,
