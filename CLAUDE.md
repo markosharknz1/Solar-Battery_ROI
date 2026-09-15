@@ -60,12 +60,22 @@ for the installer.
 
 ## Release process (how users install)
 
+**Since v1.5.0 releases ship a no-executable ZIP** (SmartScreen/Smart App Control
+kept flagging the unsigned Setup exe; same pattern as the owner's Game Scheduler
+v1.0.13): `dist\` + `launcher.cjs` (static server on fixed ports 8321-8324 +
+Edge/Chrome `--app=` window) + the official signed node.exe + one `.cmd`.
+**No exe of ours, no PowerShell, no .vbs/.wsf launchers - never reintroduce**
+(AV heuristics flag those shapes). User data = browser localStorage in
+`.edge-app-profile` INSIDE the extracted folder (portable; survives upgrades
+by extracting over). Ports must stay fixed - localStorage is origin-scoped.
+
 1. Bump `"version"` in package.json.
-2. `powershell -File build-installer.ps1` (packages via %TEMP% - building inside the
-   project tree hits a transient EPERM file lock on the owner's machine).
-3. `gh release create v<X> "release/Solar & Battery Advisor Setup <X>.exe" --title "Solar & Battery Advisor <X>"`
-4. Optionally `install.bat` to update the local install.
-Users install from the Releases page only - the repo ZIP is not an installable app.
+2. `powershell -File build-zip.ps1` (builds, downloads + SHA-verifies the official
+   Node runtime, stages, zips to `release\Solar-Battery-Advisor-v<X>.zip`).
+3. `gh release create v<X> "release/Solar-Battery-Advisor-v<X>.zip" --title "Solar & Battery Advisor <X>"`
+Users install from the Releases page only - the repo ZIP is not the app.
+Legacy Electron tooling (`electron/`, `build-installer.ps1`, `install.bat`)
+remains for reference; releases no longer ship the exe.
 
 ## Known gaps / backlog
 

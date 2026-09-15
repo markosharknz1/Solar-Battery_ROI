@@ -1,13 +1,14 @@
 # Solar & Battery Advisor
 
-> ### ⬇ Want to install the app? Start here.
-> Download the ready-made installer - the **Setup `.exe`** under "Assets" on the
-> **[Releases page](../../releases/latest)** - run it, done. Nothing else is needed
-> (no Node.js, no ZIP). Full novice-friendly walkthrough: **[INSTALL.md](INSTALL.md)**.
+> ### ⬇ Want the app? Start here.
+> Download **`Solar-Battery-Advisor-v<version>.zip`** under "Assets" on the
+> **[Releases page](../../releases/latest)**, right-click it → Properties →
+> **Unblock** → OK, extract it anywhere, and double-click
+> **`Solar & Battery Advisor.cmd`** inside. No installer, no .exe of ours, no
+> SmartScreen warnings. Full novice-friendly walkthrough: **[INSTALL.md](INSTALL.md)**.
 >
 > **Do not use the green "Code → Download ZIP" button** - that ZIP is source code
-> for developers. It is not the app, and its `.bat` files will not install anything
-> without a Node.js build environment.
+> for developers, not the app.
 
 A client-side React web app that helps Australian households analyse their smart
 meter interval data, model time-of-use tariffs, simulate battery storage, compare

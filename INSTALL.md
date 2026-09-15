@@ -1,23 +1,24 @@
 # How to install Solar & Battery Advisor
 
 This guide assumes you have **never installed anything from GitHub before**.
-Follow it top to bottom and you'll have the app running in about 5 minutes.
+Follow it top to bottom and you'll have the app running in about 3 minutes.
 
 **What you need:**
-- A Windows computer (Windows 10 or 11 - any normal PC or laptop from the last ~10 years)
-- An internet connection
-- A GitHub sign-in that has access to this project (see Step 2 - or skip
-  internet entirely and use [the USB method](#installing-on-a-computer-without-internet))
+- A Windows computer (Windows 10 or 11)
+- An internet connection (only for the download - the app itself never uses one)
+- A GitHub sign-in that has access to this project (see Step 2)
 
-You do **not** need to install anything else first. No technical tools, no
-"Node.js", nothing. The installer file contains the entire app.
+You do **not** need to install anything else first. There is **no installer
+and no .exe of ours to run** - so no SmartScreen "unrecognized app" warnings.
+The download contains the app's files plus the official Node.js runtime
+(signed by the OpenJS Foundation); the app window itself is the Microsoft
+Edge already on your computer, running in app mode.
 
 ---
 
 ## Step 1 - Open the download page
 
-On the computer where you want the app, open any web browser (Edge, Chrome,
-Firefox) and go to this address:
+On the computer where you want the app, open any web browser and go to:
 
 ```
 https://github.com/markosharknz1/Solar-Battery_ROI/releases/latest
@@ -27,151 +28,97 @@ https://github.com/markosharknz1/Solar-Battery_ROI/releases/latest
 
 Because this project is private, GitHub may show a **Sign in** page, or a
 page saying **404 - not found** (that's GitHub's way of hiding private
-projects from people who aren't signed in).
+projects from people who aren't signed in). Sign in with an account that
+has access to this project, then open the address again.
 
-- Click **Sign in** (top-right corner of the page) and log in with the GitHub
-  account that owns or has access to this project.
-- After signing in, go to the address from Step 1 again.
+## Step 3 - Download the ZIP
 
-> Installing for a friend or family member who has no GitHub account? Don't
-> create one for them - use the [USB method](#installing-on-a-computer-without-internet)
-> below instead.
+Under the **Assets** heading, click the file named like:
 
-## Step 3 - Download the installer
+```
+Solar-Battery-Advisor-v1.5.0.zip
+```
 
-You are now on a page titled **Solar & Battery Advisor** with a version number
-(for example 1.0.1).
+(Not "Source code (zip)" - that's for programmers and won't run.)
 
-1. Scroll down to the heading **Assets**. If you see a small arrow next to
-   "Assets", click it to expand the list.
-2. Click the file whose name ends in **`.exe`** - it looks like:
-   **`Solar.Battery.Advisor.Setup.1.0.1.exe`**
-3. The download starts (it's about 100 MB, so give it a minute).
-   - Ignore the other files listed there ("Source code (zip)" etc.) - those
-     are for programmers, not for installing.
+## Step 4 - Unblock the ZIP (one click, do it BEFORE extracting)
 
-Your browser saves the file in your **Downloads** folder. Some browsers show
-the download at the top-right of the window; you can click it from there too.
+In your Downloads folder, **right-click** the ZIP file, choose
+**Properties**, tick **Unblock** at the bottom, and click **OK**.
 
-> If your browser itself shows a message like "this file isn't commonly
-> downloaded" or "make sure you trust it", choose **Keep** (in Edge you may
-> need to click **⋯ → Keep → Show more → Keep anyway**). This warning appears
-> simply because the file is new and not from a big software company.
+Why: Windows tags internet downloads with a hidden marker. Unblocking the
+ZIP before extracting means every file inside comes out clean, so even PCs
+with the strictest Windows security setting (Smart App Control) will run it.
+If you don't see an Unblock box, there's nothing to do - carry on.
 
-## Step 4 - Run the installer
+## Step 5 - Extract it
 
-1. Open your **Downloads** folder (press the Windows key, type `Downloads`,
-   press Enter - or click the download in your browser).
-2. Double-click **`Solar.Battery.Advisor.Setup.1.0.1.exe`**.
-3. A blue box appears saying **"Windows protected your PC"**. This is
-   expected - Windows shows it for any program that isn't from a registered
-   big company. To continue:
-   - Click the small **More info** link in that blue box.
-   - A **Run anyway** button appears at the bottom - click it.
-4. If Windows asks **"Do you want to allow this app to make changes to your
-   device?"**, click **Yes**.
-5. The setup wizard opens:
-   - Choose **"Only for me"** or **"Anyone who uses this computer"** if asked -
-     either is fine.
-   - Accept the suggested install folder (or pick another - it doesn't matter,
-     the app works from anywhere).
-   - Click **Install**, wait for the bar to finish, then click **Finish**.
+Right-click the ZIP and choose **Extract All...**. Extract it anywhere you
+like - your Documents, `C:\Apps`, a folder on the desktop. The extracted
+`Solar & Battery Advisor` folder IS the app; there is nothing more to install.
 
-## Step 5 - Open the app
+## Step 6 - Start the app
 
-You'll find **Solar & Battery Advisor**:
-- as an icon on your **desktop**, and
-- in the **Start Menu** (press the Windows key and type `Solar`).
+Open the extracted folder and double-click:
 
-That's it. The app runs entirely on your computer - it doesn't send your data
-anywhere.
+```
+Solar & Battery Advisor.cmd
+```
+
+A small black window flashes for a moment, then the app opens in its own
+window. That's it.
+
+**Tip:** right-click the `.cmd` file → **Send to → Desktop (create shortcut)**
+for a desktop icon.
 
 ---
+
+## Where your data lives
+
+Everything you save (tariff plans, battery quotes, VPP programs, household
+settings) is stored in a folder called `.edge-app-profile` that appears next
+to the app after first run. **It never leaves your computer.**
+
+- **To upgrade:** download a newer ZIP and extract it over the same folder
+  (keep `.edge-app-profile`). Your data survives.
+- **To move the app:** move the whole folder. Data moves with it.
+- **To uninstall:** delete the folder. That's everything - nothing else is
+  written anywhere on the computer.
 
 ## Installing on a computer without internet
 
-The installer is one single file, so you can carry it across on a USB stick:
-
-1. On any computer that *can* reach the download page, do Steps 1-3 above.
-2. Copy the downloaded `.exe` file from the **Downloads** folder onto a USB
-   stick.
-3. Plug the USB stick into the other computer, copy the file onto it (e.g.
-   onto the Desktop), and continue from **Step 4**.
-
-Nothing else needs to be copied - just that one file.
-
----
-
-## Updating to a newer version
-
-Exactly the same as installing: download the newer `.exe` from the same page
-and run it. It installs over the top. Your saved settings (tariff plans,
-bills, and any data you chose to keep on the device) are kept.
-
-## Uninstalling
-
-1. Press the Windows key and type `add or remove programs`, press Enter.
-2. Find **Solar & Battery Advisor** in the list.
-3. Click it (Windows 10) or the **⋯** next to it (Windows 11) and choose
-   **Uninstall**.
-
----
+Download the ZIP on any computer (Steps 1-4, including Unblock), copy it to
+a USB stick, and do Steps 5-6 on the target computer. Let the copy finish
+completely before ejecting the stick.
 
 ## If something goes wrong
 
-**The download page says 404 or "not found"**
-You aren't signed in to GitHub, or the account you used doesn't have access to
-this project. Sign in with the right account (Step 2) and try again.
-
-**"Windows protected your PC" and I can't see a Run anyway button**
-Click the **More info** link first - the button only appears after that.
-
-**I downloaded a file called `Solar-Battery_ROI-main.zip` and there's no app in it**
-That's the project's *source code*, not the app - it's what programmers use to
-build the app, and the scripts inside need developer tools to work. Go back to
-Step 1 and download the file ending in **`.exe`** from the **Assets** list
-instead.
-
-**An error mentions `tsc`, `npm`, or `node` "is not recognized"**
-Same cause as above - you're running the programmer build scripts from the
-source code ZIP. You don't need them. Use the `.exe` from Step 3.
-
-**The installer won't start at all**
-The app needs a 64-bit version of Windows (virtually every PC since ~2010).
-Very old 32-bit machines can't run it.
+- **"needs Node.js" message:** the `node\` folder is missing - you probably
+  copied the `.cmd` file out by itself. Copy the whole extracted folder.
+- **Nothing happens at all:** look for a `launcher-error.txt` file next to
+  the `.cmd` - it says what failed.
+- Still stuck? Send a screenshot of whatever you see.
 
 ---
 
-## For developers only - building from source
+## For developers (building from source)
 
-Everything below this line requires [Node.js](https://nodejs.org) 18+ and is
-**not needed to install or use the app**.
-
-```
-git clone https://github.com/markosharknz1/Solar-Battery_ROI.git
-cd Solar-Battery_ROI
-```
-
-Then run **`build-and-install.bat`** - on first run it installs dependencies
-automatically (a few minutes; the `npm warn deprecated` messages are harmless),
-builds the web app, packages the Windows installer to
-`release\Solar & Battery Advisor Setup <version>.exe`, and installs it silently
-on this machine.
-
-To publish a new version to the download page used in Step 1: bump `"version"`
-in `package.json`, build, then:
+Everything below needs Node.js and is **not** required to use the app.
 
 ```
-gh release create v<version> "release/Solar & Battery Advisor Setup <version>.exe" --title "Solar & Battery Advisor <version>"
+npm install
+npm run dev            # hot-reload dev server
+npm run build          # production build to dist\
+powershell -File build-zip.ps1   # build the release ZIP (downloads + verifies the official Node runtime)
 ```
 
-Other scripts: `install.vbs` silently installs whatever is already in
-`release\` with no window at all (double-click it - a small popup confirms
-when done); `install.bat` does the same but in a console window; `npm run dev`
-starts the hot-reload dev server; `npm run preview` serves the built app in
-a browser.
+To publish a new version: bump `"version"` in `package.json`, run
+`build-zip.ps1`, then:
 
-If the build fails with `EPERM ... rename win-unpacked`: antivirus or indexing
-briefly locked freshly extracted files - the script already builds via a temp
-folder to dodge this; re-run, and if it persists add an antivirus exclusion for
-the project folder.
+```
+gh release create v<version> "release/Solar-Battery-Advisor-v<version>.zip" --title "Solar & Battery Advisor <version>"
+```
+
+The legacy Electron installer tooling (`electron/`, `build-installer.ps1`,
+`install.bat`) still exists but releases ship the ZIP - an unsigned Setup
+.exe trips SmartScreen, which is exactly what the ZIP design avoids.
