@@ -4,6 +4,7 @@ import { Nav } from '@/components/layout/Nav'
 import { AdvancedOverviewPage } from '@/pages/AdvancedOverviewPage'
 import { ImportPage } from '@/pages/ImportPage'
 import { HouseholdPage } from '@/pages/HouseholdPage'
+import { AboutPage } from '@/pages/AboutPage'
 import { TariffsPage } from '@/pages/TariffsPage'
 import { BatteryPage } from '@/pages/BatteryPage'
 import { ComparePage } from '@/pages/ComparePage'
@@ -44,6 +45,7 @@ function App() {
           <Route path="/battery" element={<BatteryPage />} />
           <Route path="/vpp" element={<VppPage />} />
           <Route path="/household" element={<HouseholdPage />} />
+          <Route path="/about" element={<AboutPage />} />
           <Route path="/compare" element={<ComparePage />} />
           <Route path="/analytics" element={<AnalyticsPage />} />
           <Route path="/bills" element={<BillsPage />} />

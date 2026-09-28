@@ -13,10 +13,11 @@ const links = [
   { to: '/tariffs', label: 'Tariffs' },
   { to: '/compare', label: 'Compare' },
   { to: '/analytics', label: 'Analytics' },
+  { to: '/about', label: 'About' },
 ]
 
 // Input/configuration pages that work before any meter data is loaded.
-const ALWAYS_ENABLED = new Set(['/import', '/bills', '/vpp', '/household'])
+const ALWAYS_ENABLED = new Set(['/import', '/bills', '/vpp', '/household', '/about'])
 
 export function Nav() {
   const hasData = useDataStore((s) => s.summary !== null)
