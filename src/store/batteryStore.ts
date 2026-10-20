@@ -40,6 +40,15 @@ export interface PlannerDraft {
   presetId: string | null
 }
 
+/** Inputs for the Financials tab (TCO vs mortgage / financed purchase). */
+export interface FinancingDraft {
+  mode: 'cash' | 'loan'
+  mortgageRatePct: number
+  loanRatePct: number
+  loanTermYears: number
+  priceGrowthPct: number
+}
+
 interface BatteryStore {
   quotes: BatteryQuote[]
   results: Record<string, BatterySimResult> // keyed by `${quoteId}_${tariffId}`
@@ -49,6 +58,7 @@ interface BatteryStore {
   draftQuote: BatteryQuote
   draftTariffId: string | null
   planner: PlannerDraft
+  financing: FinancingDraft
   addQuote: (q: BatteryQuote) => void
   updateQuote: (id: string, updates: Partial<BatteryQuote>) => void
   deleteQuote: (id: string) => void
@@ -56,6 +66,7 @@ interface BatteryStore {
   updateDraftQuote: (updates: Partial<BatteryQuote>) => void
   setDraftTariffId: (id: string) => void
   updatePlanner: (updates: Partial<PlannerDraft>) => void
+  updateFinancing: (updates: Partial<FinancingDraft>) => void
 }
 
 export const useBatteryStore = create<BatteryStore>()(
@@ -66,6 +77,7 @@ export const useBatteryStore = create<BatteryStore>()(
       draftQuote: defaultDraftQuote(),
       draftTariffId: null,
       planner: { chargeWindows: [], dischargeStrategy: 'peak_only', useSolar: true, presetId: null },
+      financing: { mode: 'cash', mortgageRatePct: 5.5, loanRatePct: 8, loanTermYears: 5, priceGrowthPct: 3 },
       addQuote: (q) => set({ quotes: [...get().quotes.filter((existingQuote) => existingQuote.id !== q.id), q] }),
       updateQuote: (id, updates) =>
         set({ quotes: get().quotes.map((q) => (q.id === id ? { ...q, ...updates } : q)) }),
@@ -74,6 +86,7 @@ export const useBatteryStore = create<BatteryStore>()(
       updateDraftQuote: (updates) => set({ draftQuote: { ...get().draftQuote, ...updates } }),
       setDraftTariffId: (id) => set({ draftTariffId: id }),
       updatePlanner: (updates) => set({ planner: { ...get().planner, ...updates } }),
+      updateFinancing: (updates) => set({ financing: { ...get().financing, ...updates } }),
     }),
     { name: 'sba_battery_v2', version: 2 },
   ),

@@ -7,6 +7,7 @@ import { BatteryReport } from '@/components/battery/BatteryReport'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { SavingsBreakdownChart } from '@/components/battery/SavingsBreakdownChart'
 import { MonthlySavingsChart } from '@/components/battery/MonthlySavingsChart'
+import { FinancialsPanel } from '@/components/battery/FinancialsPanel'
 import { SocChart } from '@/components/battery/SocChart'
 import { PaybackChart } from '@/components/battery/PaybackChart'
 import { CycleWarrantyPanel } from '@/components/battery/CycleWarrantyPanel'
@@ -92,6 +93,7 @@ export function BatteryResults({
           <TabsTrigger value="monthly">Monthly savings</TabsTrigger>
           <TabsTrigger value="soc">State of charge</TabsTrigger>
           <TabsTrigger value="payback">Payback</TabsTrigger>
+          <TabsTrigger value="financials">Financials</TabsTrigger>
           <TabsTrigger value="cycles">Cycles &amp; warranty</TabsTrigger>
           <TabsTrigger value="sizing">Sizing advice</TabsTrigger>
           {quote.backupCapable && <TabsTrigger value="backup">Backup</TabsTrigger>}
@@ -107,6 +109,9 @@ export function BatteryResults({
         </TabsContent>
         <TabsContent value="payback">
           <PaybackChart result={result} quote={quote} />
+        </TabsContent>
+        <TabsContent value="financials">
+          <FinancialsPanel result={result} quote={quote} />
         </TabsContent>
         <TabsContent value="cycles" className="space-y-4">
           <CycleWarrantyPanel result={result} quote={quote} plan={plan} />
