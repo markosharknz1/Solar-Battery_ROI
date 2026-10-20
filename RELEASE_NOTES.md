@@ -1,13 +1,10 @@
 ## What's new
 
-- New **Financials** tab on the battery simulation results: the true total
-  cost of ownership of the battery compared against what the money would
-  otherwise do.
-  - **Cash purchase**: counts the mortgage/offset interest the purchase money
-    would have saved (enter your own rate), with each year's battery savings
-    swept back into the offset.
-  - **Financed**: enter the loan rate and term - shows the monthly repayment,
-    total interest, and whether the savings cover the repayments.
-  - Both show lifetime TCO, total savings value, net position, the year you
-    come out in front (if ever), and a year-by-year chart. Uses the same
-    price-growth and battery-aging model as the Payback tab and PDF report.
+- The Financials tab's **Finance (loan)** mode now models real battery
+  finance offers: an **interest-free portion** (amount + its own payback
+  period) and an **interest-bearing portion** (amount + rate + its own
+  payback period), side by side. Anything the two portions don't cover is
+  counted as paid upfront in cash, and if a loan outlasts the battery's
+  lifetime those tail repayments still count against it. The TCO card spells
+  out each repayment stream (e.g. "$167/mo interest-free for 2 yrs +
+  $122/mo at 8% for 5 yrs").

@@ -44,9 +44,18 @@ export interface PlannerDraft {
 export interface FinancingDraft {
   mode: 'cash' | 'loan'
   mortgageRatePct: number
+  priceGrowthPct: number
+  // Legacy single-loan fields - kept as fallbacks for states persisted before the
+  // split-loan model (and they seed the interest-bearing defaults).
   loanRatePct: number
   loanTermYears: number
-  priceGrowthPct: number
+  // Split loan: an interest-free component and an interest-bearing component, each
+  // with its own amount and payback period. Optional so old persisted states load.
+  interestFreeAud?: number
+  interestFreeTermYears?: number
+  interestBearingAud?: number | null // null = "the rest of the battery cost"
+  interestBearingRatePct?: number
+  interestBearingTermYears?: number
 }
 
 interface BatteryStore {
@@ -77,7 +86,18 @@ export const useBatteryStore = create<BatteryStore>()(
       draftQuote: defaultDraftQuote(),
       draftTariffId: null,
       planner: { chargeWindows: [], dischargeStrategy: 'peak_only', useSolar: true, presetId: null },
-      financing: { mode: 'cash', mortgageRatePct: 5.5, loanRatePct: 8, loanTermYears: 5, priceGrowthPct: 3 },
+      financing: {
+        mode: 'cash',
+        mortgageRatePct: 5.5,
+        priceGrowthPct: 3,
+        loanRatePct: 8,
+        loanTermYears: 5,
+        interestFreeAud: 0,
+        interestFreeTermYears: 2,
+        interestBearingAud: null,
+        interestBearingRatePct: 8,
+        interestBearingTermYears: 5,
+      },
       addQuote: (q) => set({ quotes: [...get().quotes.filter((existingQuote) => existingQuote.id !== q.id), q] }),
       updateQuote: (id, updates) =>
         set({ quotes: get().quotes.map((q) => (q.id === id ? { ...q, ...updates } : q)) }),
