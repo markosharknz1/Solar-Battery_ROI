@@ -9,6 +9,16 @@ REM This is the only script in the download. Everything else is run by
 REM node.exe (signed by the OpenJS Foundation) and the Microsoft Edge or
 REM Google Chrome already on the computer.
 setlocal
+if not exist "%~dp0dist\index.html" (
+    echo It looks like this file is being run from inside the ZIP, or was copied
+    echo out on its own - the app's files are not here next to it.
+    echo.
+    echo Right-click the downloaded ZIP, choose "Extract All...", then open the
+    echo extracted folder and double-click "Solar & Battery Advisor.cmd" there.
+    echo.
+    pause
+    exit /b 1
+)
 set "NODE=%~dp0node\node.exe"
 if not exist "%NODE%" set "NODE=%ProgramFiles%\nodejs\node.exe"
 if not exist "%NODE%" (

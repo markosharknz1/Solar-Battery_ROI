@@ -80,9 +80,9 @@ function openAppWindow(url) {
   )
 }
 
-function healthCheck(port) {
+function healthCheck(port, timeout = 1500) {
   return new Promise((resolve) => {
-    const req = http.get({ host: '127.0.0.1', port, path: HEALTH_PATH, timeout: 700 }, (res) => {
+    const req = http.get({ host: '127.0.0.1', port, path: HEALTH_PATH, timeout }, (res) => {
       let body = ''
       res.on('data', (c) => (body += c))
       res.on('end', () => resolve(body.trim() === HEALTH_BODY))
@@ -95,11 +95,34 @@ function healthCheck(port) {
   })
 }
 
+/** Write the error file AND open it in Notepad - a silent text file next to the
+ * app helped nobody diagnose "nothing happened". */
+function reportFatal(message) {
+  const file = path.join(__dirname, 'launcher-error.txt')
+  try {
+    fs.writeFileSync(file, `${APP_NAME} could not start\n================================\n\n${message}\n`)
+    spawn('cmd.exe', ['/c', 'start', '', file], { stdio: 'ignore', windowsHide: true })
+  } catch {
+    /* nothing left to report to */
+  }
+}
+
+// The open app page pings /__sba-ping every 15s (src/lib/launcherKeepalive.ts);
+// the watchdog below shuts the server down once pings stop. Overridable for tests.
+const KEEPALIVE_TIMEOUT_MS = Number(process.env.SBA_KEEPALIVE_TIMEOUT_MS) || 75_000
+let lastPingAt = Date.now()
+
 function startServer(port) {
   return new Promise((resolve, reject) => {
     const server = http.createServer(async (req, res) => {
       try {
         const urlPath = decodeURIComponent(new URL(req.url, 'http://localhost').pathname)
+        if (urlPath === '/__sba-ping') {
+          lastPingAt = Date.now()
+          res.writeHead(204)
+          res.end()
+          return
+        }
         if (urlPath === HEALTH_PATH) {
           res.writeHead(200, { 'Content-Type': 'text/plain' })
           res.end(HEALTH_BODY)
@@ -125,13 +148,11 @@ function startServer(port) {
 
 async function main() {
   if (!fs.existsSync(path.join(distDir, 'index.html'))) {
-    // Headless process - surface the problem via a visible message box the
-    // only dependency-free way Windows offers Node: a msg via cmd's `mshta`?
-    // No scripts allowed. Simplest honest fallback: write a log and exit.
-    fs.writeFileSync(
-      path.join(__dirname, 'launcher-error.txt'),
-      `${APP_NAME}: dist\\index.html not found next to launcher.cjs.\n` +
-        'This file must be run from the extracted download folder (do not copy it out alone).\n',
+    reportFatal(
+      'The dist folder (the app itself) was not found next to launcher.cjs.\n\n' +
+        'This usually means the download was not fully extracted - right-click the\n' +
+        'downloaded ZIP, choose "Extract All...", and run "Solar & Battery Advisor.cmd"\n' +
+        'from the extracted folder (not from inside the ZIP, and not a copied-out file).',
     )
     process.exit(1)
   }
@@ -153,32 +174,56 @@ async function main() {
       break
     } catch (err) {
       if (err?.code !== 'EADDRINUSE') throw err
+      // The port is busy but didn't answer the health probe just now. If it IS
+      // this app (e.g. it was still starting up), hand off rather than climbing
+      // the ladder - a different port is a different storage origin, and the
+      // user's saved data would look like it vanished.
+      if (await healthCheck(p, 3000)) {
+        openAppWindow(`http://127.0.0.1:${p}/`)
+        return
+      }
     }
   }
   if (!server) {
-    fs.writeFileSync(
-      path.join(__dirname, 'launcher-error.txt'),
-      `${APP_NAME}: ports ${PORTS.join(', ')} are all in use by other programs.\n`,
+    reportFatal(
+      `Ports ${PORTS.join(', ')} are all in use by other programs, so the app's\n` +
+        'local server could not start. Close other copies of the app (check Task\n' +
+        'Manager for node.exe) or reboot, then try again.',
     )
     process.exit(1)
   }
 
-  const child = openAppWindow(`http://127.0.0.1:${port}/`)
-  if (child) {
-    // Dedicated profile => the browser process lives while the app's last
-    // window is open; when it exits, stop the server.
-    child.on('exit', () => {
-      server.close()
-      process.exit(0)
-    })
+  openAppWindow(`http://127.0.0.1:${port}/`)
+
+  // Server lifetime is governed by the page's keepalive pings, NOT by watching
+  // the spawned browser process - Edge hands windows between its own processes
+  // (especially a fresh profile's first run relaunches itself), so a child-exit
+  // signal says nothing reliable about whether the app window is still open.
+  // Killing the server on a false signal is what produced the "127.0.0.1
+  // refused to connect" / could-not-start reports. The page pings every 15s;
+  // when pings stop for KEEPALIVE_TIMEOUT_MS the window is genuinely gone, and
+  // a double-check 20s later guards against a just-woke-from-sleep race.
+  lastPingAt = Date.now() // fresh grace window for the first page load
+  const armWatchdog = () => {
+    const watchdog = setInterval(() => {
+      if (Date.now() - lastPingAt < KEEPALIVE_TIMEOUT_MS) return
+      clearInterval(watchdog)
+      // Double-check before dying: a machine that just woke from sleep can look
+      // stale for a moment before the page's wake-ping lands.
+      setTimeout(() => {
+        if (Date.now() - lastPingAt < KEEPALIVE_TIMEOUT_MS) {
+          armWatchdog() // the window is alive after all
+        } else {
+          server.close()
+          process.exit(0)
+        }
+      }, 20_000)
+    }, 10_000)
   }
+  armWatchdog()
 }
 
 main().catch((err) => {
-  try {
-    fs.writeFileSync(path.join(__dirname, 'launcher-error.txt'), `${APP_NAME} launcher failed:\n${err?.stack ?? err}\n`)
-  } catch {
-    /* nothing left to report to */
-  }
+  reportFatal(`Unexpected error:\n\n${err?.stack ?? err}`)
   process.exit(1)
 })

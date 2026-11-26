@@ -1,10 +1,23 @@
 ## What's new
 
-- The Financials tab's **Finance (loan)** mode now models real battery
-  finance offers: an **interest-free portion** (amount + its own payback
-  period) and an **interest-bearing portion** (amount + rate + its own
-  payback period), side by side. Anything the two portions don't cover is
-  counted as paid upfront in cash, and if a loan outlasts the battery's
-  lifetime those tail repayments still count against it. The TCO card spells
-  out each repayment stream (e.g. "$167/mo interest-free for 2 yrs +
-  $122/mo at 8% for 5 yrs").
+Reliability release - fixes the "could not start" / blank "can't reach this
+page" errors some launches hit:
+
+- The app window now keeps the local server alive itself (a tiny heartbeat
+  from the page), instead of the launcher guessing from browser process
+  behaviour. Edge sometimes hands the window between its own processes -
+  especially the very first launch on a new computer - and that guesswork
+  could shut the server down while the window was still open, leaving
+  "127.0.0.1 refused to connect". The server now stops about a minute after
+  the last app window actually closes, no matter which browser process owns
+  it.
+- If the app genuinely can't start, it now opens a plain-English explanation
+  in Notepad instead of writing a silent file nobody sees.
+- Running "Solar & Battery Advisor.cmd" from inside the ZIP (without
+  extracting) or as a copied-out file now explains exactly what to do,
+  instead of failing confusingly.
+- Launching the app while it's still starting up can no longer land on a
+  second port, which made saved plans look like they'd vanished.
+- The legacy Electron desktop build gained a single-instance guard and a
+  readable error dialog (double-clicking it repeatedly used to crash with a
+  raw "JavaScript error" once its ports ran out).

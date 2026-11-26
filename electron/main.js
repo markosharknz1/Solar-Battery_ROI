@@ -1,4 +1,4 @@
-import { app, BrowserWindow } from 'electron'
+import { app, BrowserWindow, dialog } from 'electron'
 import { createServer } from 'node:http'
 import { readFile, stat } from 'node:fs/promises'
 import path from 'node:path'
@@ -68,11 +68,13 @@ async function startServerOnLadder() {
   throw new Error(`All ports in ${PORT_LADDER.join(', ')} are in use`)
 }
 
+let mainWindow = null
+
 async function createWindow() {
   const server = await startServerOnLadder()
   const { port } = server.address()
 
-  const win = new BrowserWindow({
+  mainWindow = new BrowserWindow({
     width: 1280,
     height: 900,
     autoHideMenuBar: true,
@@ -82,12 +84,40 @@ async function createWindow() {
     },
   })
 
-  win.loadURL(`http://127.0.0.1:${port}/`)
+  mainWindow.loadURL(`http://127.0.0.1:${port}/`)
 
-  win.on('closed', () => server.close())
+  mainWindow.on('closed', () => {
+    mainWindow = null
+    server.close()
+  })
 }
 
-app.whenReady().then(createWindow)
+// Single instance only. Without this, every extra double-click started another
+// copy on the next ladder port - a different storage origin, so saved plans
+// "vanished" - and once all four ports were taken the app died with a raw
+// "JavaScript error in the main process" dialog ("could not start").
+if (!app.requestSingleInstanceLock()) {
+  app.quit()
+} else {
+  app.on('second-instance', () => {
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore()
+      mainWindow.focus()
+    }
+  })
+
+  app.whenReady().then(() =>
+    createWindow().catch((err) => {
+      dialog.showErrorBox(
+        'Solar & Battery Advisor could not start',
+        `${err?.message ?? err}\n\n` +
+          'Another program may be using the ports this app needs (8317-8320). ' +
+          'Close other copies of the app (check Task Manager for "Solar & Battery Advisor"), then try again.',
+      )
+      app.quit()
+    }),
+  )
+}
 
 app.on('window-all-closed', () => {
   app.quit()
