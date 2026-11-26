@@ -69,6 +69,18 @@ Edge/Chrome `--app=` window) + the official signed node.exe + one `.cmd`.
 `.edge-app-profile` INSIDE the extracted folder (portable; survives upgrades
 by extracting over). Ports must stay fixed - localStorage is origin-scoped.
 
+**Launcher lifecycle (v1.6.2): keepalive pings, never child-exit watching.**
+The page pings `/__sba-ping` every 15s (`src/lib/launcherKeepalive.ts`, wired
+in `main.tsx`); `launcher.cjs` stops the server only when pings cease (75s
+timeout + 20s double-check for sleep/wake; `SBA_KEEPALIVE_TIMEOUT_MS` env
+override for tests). Edge hands the app window between its own processes -
+always on first run with a fresh profile - so the spawned child's exit means
+nothing; don't reintroduce process watching, and don't remove the ping from
+the app. A busy port is health-checked and handed off to, never climbed past
+(a second port = a second localStorage origin = "my data vanished").
+Test-script gotcha: git-bash `cmd //c start` silently launches nothing -
+drive the `.cmd` via PowerShell `Start-Process` in lifecycle tests.
+
 **Releases are built by GitHub Actions since v1.5.1 - never `gh release create`
 by hand again.** To release: bump `"version"` in package.json, update
 RELEASE_NOTES.md (becomes the "What's new" body), commit + push, then
